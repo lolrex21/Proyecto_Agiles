@@ -1,0 +1,101 @@
+/* src/components/IncidentList/IncidentList.css */
+
+.incident-list {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.incident-list.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.loader {
+  font-size: 1rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.list-header {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #eee;
+}
+
+.list-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.incident-list-container {
+  max-height: 600px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.incident-list-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.incident-list-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.incident-list-container::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.incident-list-container::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  color: #666;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .incident-list {
+    padding: 1rem;
+  }
+
+  .incident-list-container {
+    max-height: 400px;
+  }
+
+  .list-title {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .incident-list {
+    padding: 0.75rem;
+    border-radius: 4px;
+  }
+
+  .incident-list-container {
+    max-height: 350px;
+  }
+
+  .list-title {
+    font-size: 0.95rem;
+  }
+}
