@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ChangeEvent } from 'react'
+import { useState, useRef, useCallback, type FormEvent, type ChangeEvent } from 'react'
 import { supabase } from '../services/supabaseClient'
 import { getCurrentUser } from '../services/authService'
 
@@ -36,8 +36,19 @@ export default function IncidentReportForm() {
     foto: null,
   })
   const [errors, setErrors] = useState<FormErrors>({})
+  const [fileError, setFileError] = useState('')
+  const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [holdProgress, setHoldProgress] = useState(0)
+  const [isHolding, setIsHolding] = useState(false)
+  const holdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+  const startTimeRef = useRef<number>(0)
+
+  const HOLD_DURATION = 3000
+  const BUTTON_RADIUS = 96
+  const CIRCUMFERENCE = 2 * Math.PI * BUTTON_RADIUS
 
   const validate = (): boolean => {
     const newErrors: FormErrors = {}
@@ -63,7 +74,14 @@ export default function IncidentReportForm() {
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null
-    setFormData(prev => ({ ...prev, foto: file }))
+    if (file && file.size > 5 * 1024 * 1024) {
+      setFileError('El archivo es demasiado grande. Máximo 5MB permitidos.')
+      e.target.value = ''
+      setFormData(prev => ({ ...prev, foto: null }))
+    } else {
+      setFileError('')
+      setFormData(prev => ({ ...prev, foto: file }))
+    }
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -71,22 +89,29 @@ export default function IncidentReportForm() {
     if (!validate()) return
 
     setIsSubmitting(true)
+    setSubmitError('')
 
-    const user = getCurrentUser()
+  const user = getCurrentUser()
 
-    const { error } = await supabase
-      .from('incidentes')
-      .insert([
-        {
-          usuario_id: user?.id || null,
-          zona_id: null,
-          tipo_incidente: formData.tipo,
-          descripcion: `Ubicación: ${formData.ubicacion}\nDescripción: ${formData.descripcion}`,
-          estado: 'Pendiente',
-          latitud: null,
-          longitud: null,
-        },
-      ])
+  const { error } = await supabase
+    .from('incidentes')
+    .insert([
+      {
+        usuario_id: user?.id || null,
+        zona_id: null,
+        tipo_incidente: formData.tipo,
+        descripcion: `Ubicación: ${formData.ubicacion}\nDescripción: ${formData.descripcion}`,
+        estado: 'Pendiente',
+        latitud: null,
+        longitud: null,
+      },
+    ])
+
+  if (error) {
+    setSubmitError('Error al enviar el reporte. Intente nuevamente.')
+    setIsSubmitting(false)
+    return
+  }
 
     setIsSubmitting(false)
 
@@ -103,15 +128,60 @@ export default function IncidentReportForm() {
     setShowForm(false)
     setFormData({ tipo: '', ubicacion: '', descripcion: '', foto: null })
     setErrors({})
+    setFileError('')
+    setSubmitError('')
     setSubmitted(false)
   }
 
   const handleNewReport = () => {
     setFormData({ tipo: '', ubicacion: '', descripcion: '', foto: null })
     setErrors({})
+    setFileError('')
+    setSubmitError('')
     setSubmitted(false)
     setShowForm(true)
   }
+
+  const clearHoldTimer = useCallback(() => {
+    if (holdTimerRef.current) {
+      clearInterval(holdTimerRef.current)
+      holdTimerRef.current = null
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+  }, [])
+
+  const updateProgress = useCallback(() => {
+    const elapsed = Date.now() - startTimeRef.current
+    const progress = Math.min(elapsed / HOLD_DURATION, 1)
+    setHoldProgress(progress)
+
+    if (progress < 1) {
+      animationFrameRef.current = requestAnimationFrame(updateProgress)
+    }
+  }, [])
+
+  const startHold = useCallback(() => {
+    setIsHolding(true)
+    startTimeRef.current = Date.now()
+    setHoldProgress(0)
+    animationFrameRef.current = requestAnimationFrame(updateProgress)
+
+    holdTimerRef.current = setTimeout(() => {
+      clearHoldTimer()
+      setHoldProgress(1)
+      setIsHolding(false)
+      setShowForm(true)
+    }, HOLD_DURATION)
+  }, [updateProgress, clearHoldTimer])
+
+  const cancelHold = useCallback(() => {
+    clearHoldTimer()
+    setHoldProgress(0)
+    setIsHolding(false)
+  }, [clearHoldTimer])
 
   if (submitted) {
     return (
@@ -145,20 +215,62 @@ export default function IncidentReportForm() {
       <div className="flex flex-col items-center justify-center min-h-[70vh] px-6">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-uta-navy mb-2">¿Presencias algo inusual?</h2>
-          <p className="text-gray-600 text-sm">Presiona el botón para reportar inmediatamente</p>
+          <p className="text-gray-600 text-sm">Mantén presionado el botón por 3 segundos para reportar</p>
         </div>
-
-        <button
-          onClick={() => setShowForm(true)}
-          className="w-48 h-48 rounded-full bg-uta-red hover:bg-uta-red-dark text-white font-bold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 active:scale-95 flex flex-col items-center justify-center gap-2"
-          aria-label="Reportar Emergencia"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+        <div className="relative flex items-center justify-center">
+          <svg
+            className="absolute w-56 h-56 -rotate-90"
+            viewBox="0 0 200 200"
+          >
+            <circle
+              cx="100"
+              cy="100"
+              r={BUTTON_RADIUS}
+              fill="none"
+              stroke="rgba(192, 0, 0, 0.2)"
+              strokeWidth="6"
+            />
+            <circle
+              cx="100"
+              cy="100"
+              r={BUTTON_RADIUS}
+              fill="none"
+              stroke="#FFBD00"
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeDasharray={CIRCUMFERENCE}
+              strokeDashoffset={CIRCUMFERENCE * (1 - holdProgress)}
+              className="transition-none"
+            />
           </svg>
-
-          <span className="leading-tight">¡REPORTAR<br />EMERGENCIA!</span>
-        </button>
+          <button
+            onMouseDown={startHold}
+            onMouseUp={cancelHold}
+            onMouseLeave={cancelHold}
+            onTouchStart={(e) => {
+              e.preventDefault()
+              startHold()
+            }}
+            onTouchEnd={cancelHold}
+            onTouchCancel={cancelHold}
+            className={`relative w-48 h-48 rounded-full bg-uta-red text-white font-bold text-lg shadow-xl flex flex-col items-center justify-center gap-2 select-none touch-none ${
+              isHolding
+                ? 'bg-uta-red-dark scale-105'
+                : 'hover:bg-uta-red-dark hover:shadow-2xl hover:scale-105 active:scale-95'
+            } transition-all duration-150`}
+            aria-label="Mantén presionado para reportar emergencia"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
+            <span className="leading-tight">¡REPORTAR<br/>EMERGENCIA!</span>
+            {isHolding && (
+              <span className="text-xs font-mono mt-1 opacity-80">
+                {Math.round(holdProgress * 100)}%
+              </span>
+            )}
+          </button>
+        </div>
       </div>
     )
   }
@@ -169,6 +281,12 @@ export default function IncidentReportForm() {
         <div className="bg-uta-red px-4 py-4">
           <h2 className="text-white text-lg font-bold text-center">Reportar Incidente</h2>
         </div>
+
+        {submitError && (
+          <div className="mx-5 mt-4 p-3 bg-red-50 border border-uta-red rounded-lg">
+            <p className="text-uta-red text-sm font-medium">{submitError}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="p-5 space-y-5" noValidate>
           <div>
@@ -256,11 +374,12 @@ export default function IncidentReportForm() {
                 type="file"
                 id="foto"
                 name="foto"
-                accept="image/*"
+                accept="image/png, image/jpeg"
                 onChange={handleFileChange}
                 className="hidden"
               />
             </label>
+            {fileError && <p className="text-uta-red text-xs mt-1">{fileError}</p>}
           </div>
 
           <div className="flex gap-3 pt-2">
