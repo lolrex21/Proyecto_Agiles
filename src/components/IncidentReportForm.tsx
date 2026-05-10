@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, type FormEvent, type ChangeEvent } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../services/supabaseClient'
+import { getCurrentUser } from '../services/authService'
 
 type IncidentType = '' | 'robo' | 'agresion' | 'vandalismo' | 'sospechoso' | 'accidente' | 'otro'
 
@@ -51,18 +52,23 @@ export default function IncidentReportForm() {
 
   const validate = (): boolean => {
     const newErrors: FormErrors = {}
+
     if (!formData.tipo) newErrors.tipo = 'Seleccione un tipo de incidente'
     if (!formData.ubicacion.trim()) newErrors.ubicacion = 'Ingrese la ubicación exacta'
     if (!formData.descripcion.trim()) newErrors.descripcion = 'Ingrese una descripción'
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
+
     if (errors[name as keyof FormErrors]) {
-      setErrors(prev => ({ ...prev, [name]: undefined }))
+      setErrors(prev => ({ ...prev, [name as keyof FormErrors]: undefined }))
     }
   }
 
@@ -85,23 +91,36 @@ export default function IncidentReportForm() {
     setIsSubmitting(true)
     setSubmitError('')
 
-    const combinedDescription = `Ubicación: ${formData.ubicacion} - Descripción: ${formData.descripcion}`
+  const user = getCurrentUser()
 
-    const { error } = await supabase.from('incidentes').insert({
-      tipo_incidente: formData.tipo,
-      descripcion: combinedDescription,
-      latitud: 0.0,
-      longitud: 0.0,
-      usuario_id: null,
-    })
+  const { error } = await supabase
+    .from('incidentes')
+    .insert([
+      {
+        usuario_id: user?.id || null,
+        zona_id: null,
+        tipo_incidente: formData.tipo,
+        descripcion: `Ubicación: ${formData.ubicacion}\nDescripción: ${formData.descripcion}`,
+        estado: 'Pendiente',
+        latitud: null,
+        longitud: null,
+      },
+    ])
+
+  if (error) {
+    setSubmitError('Error al enviar el reporte. Intente nuevamente.')
+    setIsSubmitting(false)
+    return
+  }
+
+    setIsSubmitting(false)
 
     if (error) {
-      setSubmitError('Error al enviar el reporte. Intente nuevamente.')
-      setIsSubmitting(false)
+      console.error('Error al guardar incidente:', error)
+      alert('No se pudo enviar el reporte.')
       return
     }
 
-    setIsSubmitting(false)
     setSubmitted(true)
   }
 
@@ -120,6 +139,7 @@ export default function IncidentReportForm() {
     setFileError('')
     setSubmitError('')
     setSubmitted(false)
+    setShowForm(true)
   }
 
   const clearHoldTimer = useCallback(() => {
@@ -172,10 +192,13 @@ export default function IncidentReportForm() {
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </div>
+
           <h2 className="text-xl font-bold text-uta-navy mb-2">¡Reporte Enviado!</h2>
+
           <p className="text-gray-600 mb-6 text-sm">
-            Tu reporte de emergencia ha sido recibido. El equipo de seguridad ha sido notificado.
+            Tu reporte de emergencia ha sido guardado correctamente. El equipo de seguridad podrá visualizarlo.
           </p>
+
           <button
             onClick={handleNewReport}
             className="w-full py-3 px-6 bg-uta-gold hover:bg-uta-gold-dark text-uta-navy font-bold rounded-lg transition-colors duration-200"
@@ -270,6 +293,7 @@ export default function IncidentReportForm() {
             <label htmlFor="tipo" className="block text-sm font-semibold text-uta-navy mb-1.5">
               Tipo de Incidente <span className="text-uta-red">*</span>
             </label>
+
             <select
               id="tipo"
               name="tipo"
@@ -283,6 +307,7 @@ export default function IncidentReportForm() {
                 </option>
               ))}
             </select>
+
             {errors.tipo && <p className="text-uta-red text-xs mt-1">{errors.tipo}</p>}
           </div>
 
@@ -290,11 +315,8 @@ export default function IncidentReportForm() {
             <label htmlFor="ubicacion" className="block text-sm font-semibold text-uta-navy mb-1.5">
               Ubicación Exacta <span className="text-uta-red">*</span>
             </label>
+
             <div className="relative">
-              <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                <circle cx="12" cy="10" r="3"/>
-              </svg>
               <input
                 type="text"
                 id="ubicacion"
@@ -302,9 +324,10 @@ export default function IncidentReportForm() {
                 value={formData.ubicacion}
                 onChange={handleChange}
                 placeholder="Ej: Edificio A, Piso 2, Aula 204"
-                className={`w-full pl-10 pr-3 py-2.5 border-2 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold ${errors.ubicacion ? 'border-uta-red' : 'border-gray-200'}`}
+                className={`w-full px-3 py-2.5 border-2 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold ${errors.ubicacion ? 'border-uta-red' : 'border-gray-200'}`}
               />
             </div>
+
             {errors.ubicacion && <p className="text-uta-red text-xs mt-1">{errors.ubicacion}</p>}
           </div>
 
@@ -312,6 +335,7 @@ export default function IncidentReportForm() {
             <label htmlFor="descripcion" className="block text-sm font-semibold text-uta-navy mb-1.5">
               Descripción <span className="text-uta-red">*</span>
             </label>
+
             <textarea
               id="descripcion"
               name="descripcion"
@@ -321,6 +345,7 @@ export default function IncidentReportForm() {
               placeholder="Describe lo que está sucediendo..."
               className={`w-full px-3 py-2.5 border-2 rounded-lg text-sm resize-none transition-colors focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold ${errors.descripcion ? 'border-uta-red' : 'border-gray-200'}`}
             />
+
             {errors.descripcion && <p className="text-uta-red text-xs mt-1">{errors.descripcion}</p>}
           </div>
 
@@ -328,33 +353,23 @@ export default function IncidentReportForm() {
             <label htmlFor="foto" className="block text-sm font-semibold text-uta-navy mb-1.5">
               Adjuntar Foto <span className="text-gray-400 font-normal">(opcional)</span>
             </label>
+
             <label
               htmlFor="foto"
               className="flex flex-col items-center justify-center w-full py-6 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-uta-gold hover:bg-uta-gray/50 transition-colors"
             >
               {formData.foto ? (
                 <>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-green-500 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="16" y1="13" x2="8" y2="13"/>
-                    <line x1="16" y1="17" x2="8" y2="17"/>
-                    <polyline points="10 9 9 9 8 9"/>
-                  </svg>
                   <span className="text-sm text-gray-700 font-medium">{formData.foto.name}</span>
                   <span className="text-xs text-gray-400 mt-0.5">Click para cambiar</span>
                 </>
               ) : (
                 <>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-gray-400 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                    <polyline points="21 15 16 10 5 21"/>
-                  </svg>
                   <span className="text-sm text-gray-500">Tap para subir foto</span>
                   <span className="text-xs text-gray-400 mt-0.5">PNG, JPG hasta 5MB</span>
                 </>
               )}
+
               <input
                 type="file"
                 id="foto"
@@ -376,22 +391,13 @@ export default function IncidentReportForm() {
             >
               CANCELAR
             </button>
+
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 py-3 px-4 bg-uta-red hover:bg-uta-red-dark text-white font-bold text-sm rounded-lg transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+              className="flex-1 py-3 px-4 bg-uta-red hover:bg-uta-red-dark text-white font-bold text-sm rounded-lg transition-colors disabled:opacity-70"
             >
-              {isSubmitting ? (
-                <>
-                  <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                  </svg>
-                  Enviando...
-                </>
-              ) : (
-                'ENVIAR REPORTE'
-              )}
+              {isSubmitting ? 'Enviando...' : 'ENVIAR REPORTE'}
             </button>
           </div>
         </form>
