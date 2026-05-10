@@ -86,26 +86,26 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
 
   if (isAuthenticated()) {
     return (
-      <div className="max-w-md mx-auto mt-16 p-6 bg-white rounded-3xl shadow-lg">
-        <h2 className="text-2xl font-bold text-uta-navy mb-4">Ya has iniciado sesión</h2>
-        <p className="text-sm text-gray-600">Tu sesión ya está activa. Si deseas cambiar de cuenta, cierra sesión.</p>
+      <div className="max-w-md mx-auto mt-8 sm:mt-16 px-4 py-6 sm:p-6 bg-white rounded-2xl sm:rounded-3xl shadow-lg">
+        <h2 className="text-xl sm:text-2xl font-bold text-uta-navy mb-3 sm:mb-4">Ya has iniciado sesión</h2>
+        <p className="text-xs sm:text-sm text-gray-600">Tu sesión ya está activa. Si deseas cambiar de cuenta, cierra sesión.</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-7">
-        <h1 className="text-2xl font-bold text-uta-navy mb-2">{mode === 'login' ? 'Iniciar Sesión' : 'Registrar Cuenta'}</h1>
-        <p className="text-sm text-gray-600 mb-6">
+    <div className="min-h-[70vh] flex items-center justify-center px-4 py-6 sm:py-8">
+      <div className="w-full max-w-md bg-white rounded-2xl sm:rounded-3xl shadow-xl p-5 sm:p-7">
+        <h1 className="text-2xl sm:text-3xl font-bold text-uta-navy mb-1 sm:mb-2">{mode === 'login' ? 'Iniciar Sesión' : 'Registrar Cuenta'}</h1>
+        <p className="text-xs sm:text-sm text-gray-600 mb-5 sm:mb-6">
           {mode === 'login'
             ? 'Ingresa tus credenciales de forma segura.'
             : 'Crea una cuenta con contraseña segura y cifrada.'}
         </p>
 
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="mb-4">
-            <label htmlFor="username" className="block text-sm font-semibold text-uta-navy mb-1">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4 sm:space-y-5">
+          <div>
+            <label htmlFor="username" className="block text-xs sm:text-sm font-semibold text-uta-navy mb-2">
               Correo institucional
             </label>
             <input
@@ -114,14 +114,15 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
               type="text"
               value={credentials.username}
               onChange={handleInputChange}
-              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm focus:border-uta-gold focus:outline-none focus:ring-2 focus:ring-uta-gold/20"
+              placeholder="tu.email@uta.edu.mx"
+              className="w-full rounded-xl sm:rounded-2xl border-2 border-gray-200 px-4 py-3 sm:py-4 text-sm sm:text-base focus:border-uta-gold focus:outline-none focus:ring-2 focus:ring-uta-gold/20 transition"
               autoComplete="username"
             />
-            {errors.username && <p className="mt-2 text-xs text-uta-red">{errors.username}</p>}
+            {errors.username && <p className="mt-2 text-xs text-uta-red font-medium">{errors.username}</p>}
           </div>
 
-          <div className="mb-4">
-            <label htmlFor="password" className="block text-sm font-semibold text-uta-navy mb-1">
+          <div>
+            <label htmlFor="password" className="block text-xs sm:text-sm font-semibold text-uta-navy mb-2">
               Contraseña
             </label>
             <input
@@ -130,35 +131,36 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
               type="password"
               value={credentials.password}
               onChange={handleInputChange}
-              className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm focus:border-uta-gold focus:outline-none focus:ring-2 focus:ring-uta-gold/20"
+              placeholder="Mínimo 8 caracteres"
+              className="w-full rounded-xl sm:rounded-2xl border-2 border-gray-200 px-4 py-3 sm:py-4 text-sm sm:text-base focus:border-uta-gold focus:outline-none focus:ring-2 focus:ring-uta-gold/20 transition"
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             />
-            {errors.password && <p className="mt-2 text-xs text-uta-red">{errors.password}</p>}
+            {errors.password && <p className="mt-2 text-xs text-uta-red font-medium">{errors.password}</p>}
           </div>
 
-          {message && <div className="mb-4 rounded-2xl bg-uta-gray/30 px-4 py-3 text-sm text-gray-700">{message}</div>}
+          {message && <div className="rounded-xl sm:rounded-2xl bg-uta-gray/30 px-4 py-3 sm:py-4 text-xs sm:text-sm text-gray-700 border border-gray-200">{message}</div>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-2xl bg-uta-navy px-4 py-3 text-white font-semibold transition hover:bg-uta-navy-dark disabled:cursor-not-allowed disabled:opacity-70"
+            className="w-full rounded-xl sm:rounded-2xl bg-uta-navy px-4 py-4 sm:py-5 text-sm sm:text-base text-white font-bold transition duration-200 hover:bg-uta-navy-dark disabled:cursor-not-allowed disabled:opacity-60 active:scale-95"
           >
             {loading ? 'Procesando...' : mode === 'login' ? 'Entrar' : 'Registrarse'}
           </button>
 
-          <div className="mt-5 text-center text-sm text-gray-600">
+          <div className="mt-5 sm:mt-7 text-center text-xs sm:text-sm text-gray-600">
             {mode === 'login'
               ? (
                 <>
                   ¿No tienes cuenta?{' '}
-                  <button type="button" onClick={toggleMode} className="font-semibold text-uta-gold hover:text-uta-gold-dark">
+                  <button type="button" onClick={toggleMode} className="font-bold text-uta-gold hover:text-uta-gold-dark transition">
                     Regístrate
                   </button>
                 </>
               ) : (
                 <>
                   ¿Ya tienes cuenta?{' '}
-                  <button type="button" onClick={toggleMode} className="font-semibold text-uta-gold hover:text-uta-gold-dark">
+                  <button type="button" onClick={toggleMode} className="font-bold text-uta-gold hover:text-uta-gold-dark transition">
                     Inicia sesión
                   </button>
                 </>
