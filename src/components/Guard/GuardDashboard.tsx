@@ -1,73 +1,61 @@
-// src/components/Guard/GuardDashboard.tsx
+import { useState } from 'react'
+import Header from '../Header'
+import SearchBar from '../SearchBar'
+import IncidentMap from '../Map/IncidentMap'
+import IncidentList from '../IncidentList'
+import { useIncidents } from '../../hooks/useIncidents'
 
-import { useState } from 'react';
-import { Header } from '../Header';
-import { SearchBar } from '../SearchBar';
-import { IncidentMap } from '../Map';
-import { IncidentList } from '../IncidentList';
-import { useIncidents } from '../../hooks/useIncidents';
-import './GuardDashboard.css';
-
-export const GuardDashboard: React.FC = () => {
+export default function GuardDashboard() {
   const {
     incidents,
     loading,
     selectedIncident,
     setSelectedIncident,
-    updateIncidentStatus,
-    searchIncidents
-  } = useIncidents();
+    updateStatus,
+    handleSearch,
+  } = useIncidents()
 
-  const [displayMode, setDisplayMode] = useState<'split' | 'map' | 'list'>('split');
-
-  const handleSearch = async (query: string) => {
-    if (!query.trim()) {
-      searchIncidents('');
-    } else {
-      searchIncidents(query);
-    }
-  };
-
-  const handleStatusUpdate = async (id: string, status: string) => {
-    const success = await updateIncidentStatus(id, status);
-    if (success) {
-      alert(`Incidente actualizado a: ${status}`);
-    }
-  };
+  const [viewMode, setViewMode] = useState<'split' | 'map' | 'list'>('split')
 
   return (
-    <div className="guard-dashboard">
-      <Header userName="Jonathan Gamboa Guarda" userZone="Zona I" />
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <Header />
 
-      <main className="dashboard-main">
+      <main className="flex-1 p-4 overflow-y-auto max-w-7xl w-full mx-auto">
         <SearchBar onSearch={handleSearch} />
 
-        <div className="dashboard-controls">
-          <div className="view-toggle">
-            <button
-              className={`toggle-btn ${displayMode === 'split' ? 'active' : ''}`}
-              onClick={() => setDisplayMode('split')}
-            >
-              📊 Vista Dividida
-            </button>
-            <button
-              className={`toggle-btn ${displayMode === 'map' ? 'active' : ''}`}
-              onClick={() => setDisplayMode('map')}
-            >
-              🗺️ Solo Mapa
-            </button>
-            <button
-              className={`toggle-btn ${displayMode === 'list' ? 'active' : ''}`}
-              onClick={() => setDisplayMode('list')}
-            >
-              📋 Solo Lista
-            </button>
-          </div>
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setViewMode('split')}
+            className={`px-4 py-2 rounded ${
+              viewMode === 'split' ? 'bg-blue-600 text-white' : 'bg-white'
+            }`}
+          >
+            📊 Dividida
+          </button>
+          <button
+            onClick={() => setViewMode('map')}
+            className={`px-4 py-2 rounded ${
+              viewMode === 'map' ? 'bg-blue-600 text-white' : 'bg-white'
+            }`}
+          >
+            🗺️ Mapa
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-2 rounded ${
+              viewMode === 'list' ? 'bg-blue-600 text-white' : 'bg-white'
+            }`}
+          >
+            📋 Lista
+          </button>
         </div>
 
-        <div className={`dashboard-content ${displayMode}`}>
-          {(displayMode === 'split' || displayMode === 'map') && (
-            <div className="map-section">
+        <div className={`grid gap-4 ${
+          viewMode === 'split' ? 'grid-cols-2' : 'grid-cols-1'
+        } h-96`}>
+          {(viewMode === 'split' || viewMode === 'map') && (
+            <div className="rounded-lg overflow-hidden">
               <IncidentMap
                 incidents={incidents}
                 loading={loading}
@@ -76,34 +64,32 @@ export const GuardDashboard: React.FC = () => {
             </div>
           )}
 
-          {(displayMode === 'split' || displayMode === 'list') && (
-            <div className="list-section">
-              <IncidentList
-                incidents={incidents}
-                loading={loading}
-                onSelectIncident={setSelectedIncident}
-                onStatusUpdate={handleStatusUpdate}
-              />
-            </div>
+          {(viewMode === 'split' || viewMode === 'list') && (
+            <IncidentList
+              incidents={incidents}
+              loading={loading}
+              onSelect={setSelectedIncident}
+              onStatusUpdate={updateStatus}
+            />
           )}
         </div>
 
         {selectedIncident && (
-          <div className="incident-detail-panel">
+          <div className="fixed bottom-4 right-4 bg-white p-4 rounded-lg shadow-lg max-w-sm">
             <button
-              className="close-btn"
               onClick={() => setSelectedIncident(null)}
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
             >
               ✕
             </button>
-            <h3>{selectedIncident.title}</h3>
-            <p><strong>Ubicación:</strong> {selectedIncident.location}</p>
-            <p><strong>Descripción:</strong> {selectedIncident.description}</p>
-            <p><strong>Reportado por:</strong> {selectedIncident.reportedBy}</p>
-            <p><strong>Estado:</strong> <span className={`status status-${selectedIncident.status.toLowerCase()}`}>{selectedIncident.status}</span></p>
+            <h3 className="font-bold mb-2">{selectedIncident.tipo_incidente}</h3>
+            <p className="text-sm text-gray-700 mb-2">{selectedIncident.descripcion}</p>
+            <p className="text-xs text-gray-600">
+              Estado: <strong>{selectedIncident.estado}</strong>
+            </p>
           </div>
         )}
       </main>
     </div>
-  );
-};
+  )
+}

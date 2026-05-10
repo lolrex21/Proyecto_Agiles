@@ -1,64 +1,57 @@
-// src/hooks/useIncidents.ts
-
-import { useState, useEffect } from 'react';
-import type { Incident } from '../types/incident';
-import { IncidentService } from '../services/incidentService';
+import { useState, useEffect } from 'react'
+import type { Incident } from '../types/incident'
+import { getIncidents, updateIncidentStatus, searchIncidents } from '../services/incidentService'
 
 export const useIncidents = () => {
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+  const [incidents, setIncidents] = useState<Incident[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
 
+  // Cargar incidentes al iniciar
   useEffect(() => {
-    fetchIncidents();
-  }, []);
+    fetchIncidents()
+  }, [])
 
   const fetchIncidents = async () => {
     try {
-      setLoading(true);
-      const data = await IncidentService.getIncidents();
-      setIncidents(data);
-      setError(null);
+      setLoading(true)
+      const data = await getIncidents()
+      setIncidents(data)
     } catch (err) {
-      setError('Error al cargar los incidentes');
-      console.error(err);
+      console.error('Error fetching:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const updateIncidentStatus = async (id: string, newStatus: "Activo" | "Atendido" | "Cerrado") => {
-    const success = await IncidentService.updateIncidentStatus(id, newStatus);
+  const updateStatus = async (id: number, status: 'Pendiente' | 'Atendido' | 'Cerrado') => {
+    const success = await updateIncidentStatus(id, status)
     if (success) {
-      setIncidents(incidents.map(inc => 
-        inc.id === id ? { ...inc, status: newStatus } : inc
-      ));
+      setIncidents(
+        incidents.map(inc =>
+          inc.id === id ? { ...inc, estado: status } : inc
+        )
+      )
     }
-    return success;
-  };
+    return success
+  }
 
-  const searchIncidents = async (query: string) => {
+  const handleSearch = async (query: string) => {
     if (!query.trim()) {
-      fetchIncidents();
-      return;
+      fetchIncidents()
+      return
     }
-    const filtered = incidents.filter(inc =>
-      inc.title.toLowerCase().includes(query.toLowerCase()) ||
-      inc.location.toLowerCase().includes(query.toLowerCase()) ||
-      inc.type.toLowerCase().includes(query.toLowerCase())
-    );
-    setIncidents(filtered);
-  };
+    const data = await searchIncidents(query)
+    setIncidents(data)
+  }
 
   return {
     incidents,
     loading,
-    error,
     selectedIncident,
     setSelectedIncident,
     fetchIncidents,
-    updateIncidentStatus,
-    searchIncidents
-  };
-};
+    updateStatus,
+    handleSearch,
+  }
+}

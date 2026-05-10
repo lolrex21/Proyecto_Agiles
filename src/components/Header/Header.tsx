@@ -1,28 +1,29 @@
-// src/components/Header/Header.tsx
+import { getCurrentUser, logout } from '../../services/authService'
 
-import './Header.css';
+export default function Header() {
+  const user = getCurrentUser()
 
-interface HeaderProps {
-  userName: string;
-  userZone: string;
-}
+  const handleLogout = () => {
+    logout()
+    window.location.href = '/'
+  }
 
-export const Header: React.FC<HeaderProps> = ({ userName, userZone }) => {
   return (
-    <header className="header">
-      <div className="header-container">
-        <div className="header-left">
-          <h1 className="header-logo">UTA CampusSeguro</h1>
-          <div className="header-user-info">
-            <span className="user-name">{userName}</span>
-            <span className="user-zone">{userZone}</span>
-          </div>
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-100">
+      <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">UTA CampusSeguro</h1>
+          <p className="text-sm text-gray-600">
+            Guardia: {user?.nombre} | Zona: {user?.zona_id || 'Sin asignar'}
+          </p>
         </div>
-        <div className="header-right">
-          <button className="header-btn">Perfil</button>
-          <button className="header-btn logout">Salir</button>
-        </div>
+        <button
+          onClick={handleLogout}
+          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+        >
+          Salir
+        </button>
       </div>
     </header>
-  );
-};
+  )
+}

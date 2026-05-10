@@ -1,55 +1,45 @@
-// src/components/IncidentList/IncidentList.tsx
-
-// src/components/IncidentList/IncidentList.tsx
-import type { Incident } from '../../types/incident';
-import { IncidentCard } from '../IncidentCard';
-import './IncidentList.css';
+import type { Incident } from '../../types/incident'
+import IncidentCard from '../IncidentCard'
 
 interface IncidentListProps {
-  incidents: Incident[];
-  loading: boolean;
-  onSelectIncident?: (incident: Incident) => void;
-  onStatusUpdate?: (id: string, status: string) => void;
+  incidents: Incident[]
+  loading: boolean
+  onSelect: (incident: Incident) => void
+  onStatusUpdate: (id: number, status: 'Pendiente' | 'Atendido' | 'Cerrado') => Promise<boolean>
 }
 
-export const IncidentList: React.FC<IncidentListProps> = ({
+export default function IncidentList({
   incidents,
   loading,
-  onSelectIncident,
-  onStatusUpdate
-}) => {
+  onSelect,
+  onStatusUpdate,
+}: IncidentListProps) {
   if (loading) {
-    return (
-      <div className="incident-list loading">
-        <div className="loader">Cargando incidentes...</div>
-      </div>
-    );
+    return <div className="bg-white rounded-lg p-4">Cargando...</div>
   }
 
   return (
-    <div className="incident-list">
-      <div className="list-header">
-        <h3 className="list-title">
-          Incidentes cercanos ({incidents.length})
-        </h3>
-      </div>
+    <div className="bg-white rounded-lg shadow p-4">
+      <h3 className="text-lg font-bold mb-4 text-gray-900">
+        Incidentes cercanos ({incidents.length})
+      </h3>
 
       {incidents.length === 0 ? (
-        <div className="empty-state">
-          <p>✓ No hay incidentes reportados</p>
-        </div>
+        <p className="text-gray-600 text-center py-8">
+          ✓ No hay incidentes reportados
+        </p>
       ) : (
-        <div className="incident-list-container">
+        <div className="space-y-2 max-h-96 overflow-y-auto">
           {incidents.map((incident) => (
             <IncidentCard
               key={incident.id}
               incident={incident}
-              onSelect={onSelectIncident}
+              onSelect={() => onSelect(incident)}
               onStatusUpdate={onStatusUpdate}
             />
           ))}
         </div>
       )}
     </div>
-  );
-};
+  )
+}

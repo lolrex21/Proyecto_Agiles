@@ -1,1 +1,1 @@
-export * from './IncidentCard';
+export { default } from './IncidentCard';

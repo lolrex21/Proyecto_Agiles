@@ -1,164 +1,81 @@
-// src/components/Map/IncidentMap.tsx
-
-import { GoogleMap, useLoadScript, Marker, InfoWindow } from '@react-google-maps/api';
-import { useState } from 'react';
-import type { Incident } from '../../types/incident';
-import './IncidentMap.css';
+import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api'
+import { useState } from 'react'
+import type { Incident } from '../../types/incident'
 
 interface IncidentMapProps {
-  incidents: Incident[];
-  loading: boolean;
-  onMarkerClick?: (incident: Incident) => void;
+  incidents: Incident[]
+  loading: boolean
+  onMarkerClick?: (incident: Incident) => void
 }
 
-const mapContainerStyle = {
-  width: '100%',
-  height: '100%',
-};
+const mapContainerStyle = { width: '100%', height: '100%' }
+const defaultCenter = { lat: -1.2345, lng: -78.6234 }
 
-const defaultCenter = {
-  lat: -1.2345, // Coordenadas UTA Ambato
-  lng: -78.6234,
-};
-
-const zoomLevel = 16;
-
-export const IncidentMap: React.FC<IncidentMapProps> = ({
+export default function IncidentMap({
   incidents,
   loading,
-  onMarkerClick
-}) => {
-  const [selectedMarker, setSelectedMarker] = useState<Incident | null>(null);
-
-  const mapApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: mapApiKey ?? '',
-  });
-
-  const getMarkerColor = (status: string): string => {
-    switch (status) {
-      case 'Activo':
-        return '#ff0000'; // Rojo
-      case 'Atendido':
-        return '#ffa500'; // Naranja
-      case 'Cerrado':
-        return '#00aa00'; // Verde
-      default:
-        return '#0066cc'; // Azul
-    }
-  };
+  onMarkerClick,
+}: IncidentMapProps) {
+  const [selectedMarker, setSelectedMarker] = useState<Incident | null>(null)
 
   const handleMarkerClick = (incident: Incident) => {
-    setSelectedMarker(incident);
-    if (onMarkerClick) {
-      onMarkerClick(incident);
-    }
-  };
-
-  if (!mapApiKey) {
-    return (
-      <div className="map-container error">
-        <div className="error-message">
-          <p>❌ Error al cargar el mapa</p>
-          <small>No se encontró la clave de Google Maps. Revisa tu archivo .env.</small>
-        </div>
-      </div>
-    );
+    setSelectedMarker(incident)
+    if (onMarkerClick) onMarkerClick(incident)
   }
 
-  if (loading || !isLoaded) {
+  if (loading) {
     return (
-      <div className="map-container loading">
-        <div className="map-loader">
-          <div className="spinner"></div>
-          <p>Cargando mapa...</p>
-        </div>
+      <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
+        Cargando mapa...
       </div>
-    );
+    )
   }
 
-  if (loadError) {
-    return (
-      <div className="map-container error">
-        <div className="error-message">
-          <p>❌ Error al cargar el mapa</p>
-          <small>{loadError.message || 'No se pudo cargar Google Maps.'}</small>
-        </div>
-      </div>
-    );
-  }
+  const incidentsWithLocation = incidents.filter(i => i.latitud && i.longitud)
 
   return (
-    <div className="map-container">
-      {incidents.length === 0 ? (
-        <div className="no-incidents">
-          <p>✓ No hay incidentes reportados</p>
-          <small>El mapa se muestra sin marcadores</small>
+    <div className="w-full h-full rounded-lg overflow-hidden relative bg-gray-100">
+      {incidentsWithLocation.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/80">
+          <p className="text-gray-600">✓ No hay incidentes con ubicación</p>
         </div>
-      ) : null}
+      )}
 
-      <GoogleMap
+      <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
+        <GoogleMap
           mapContainerStyle={mapContainerStyle}
           center={defaultCenter}
-          zoom={zoomLevel}
-          options={{
-            styles: [
-              {
-                featureType: 'water',
-                elementType: 'geometry',
-                stylers: [{ color: '#c9c9c9' }],
-              },
-              {
-                featureType: 'landscape',
-                elementType: 'geometry',
-                stylers: [{ color: '#f3f3f3' }],
-              },
-            ],
-          }}
+          zoom={16}
         >
-          {/* Marcadores de incidentes */}
-          {incidents.map((incident) => (
+          {incidentsWithLocation.map((incident) => (
             <Marker
               key={incident.id}
               position={{
-                lat: incident.latitude,
-                lng: incident.longitude,
+                lat: incident.latitud!,
+                lng: incident.longitud!,
               }}
-              title={incident.title}
-              icon={{
-                path: window.google.maps.SymbolPath.CIRCLE,
-                scale: 12,
-                fillColor: getMarkerColor(incident.status),
-                fillOpacity: 0.8,
-                strokeColor: '#ffffff',
-                strokeWeight: 2,
-              }}
+              title={incident.tipo_incidente}
               onClick={() => handleMarkerClick(incident)}
             />
           ))}
 
-          {/* Ventana de información */}
-          {selectedMarker && (
+          {selectedMarker && selectedMarker.latitud && (
             <InfoWindow
               position={{
-                lat: selectedMarker.latitude,
-                lng: selectedMarker.longitude,
+                lat: selectedMarker.latitud,
+                lng: selectedMarker.longitud!,
               }}
               onCloseClick={() => setSelectedMarker(null)}
             >
-              <div className="info-window">
-                <h4>{selectedMarker.title}</h4>
-                <p className={`status status-${selectedMarker.status.toLowerCase()}`}>
-                  {selectedMarker.status}
-                </p>
-                <p className="location">📍 {selectedMarker.location}</p>
-                <p className="time">⏱️ {selectedMarker.estimatedTime}</p>
-                <p className="description">{selectedMarker.description}</p>
-                <small>Reportado por: {selectedMarker.reportedBy}</small>
+              <div className="p-2 max-w-xs">
+                <h4 className="font-bold text-sm mb-1">{selectedMarker.tipo_incidente}</h4>
+                <p className="text-xs text-gray-600 mb-1">{selectedMarker.estado}</p>
+                <p className="text-xs">{selectedMarker.descripcion}</p>
               </div>
             </InfoWindow>
           )}
         </GoogleMap>
+      </LoadScript>
     </div>
-  );
-};
+  )
+}
