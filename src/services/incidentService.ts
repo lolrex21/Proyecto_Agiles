@@ -9,7 +9,7 @@ export const getIncidents = async (): Promise<Incident[]> => {
       *,
       usuario:usuarios(nombre)
     `)
-    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
 
   if (error) {
     console.error('Error:', error)
@@ -27,7 +27,7 @@ export const getIncidentsByStatus = async (status: string): Promise<Incident[]> 
       usuario:usuarios(nombre)
     `)
     .eq('estado', status)
-    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
 
   if (error) return []
   return data || []
@@ -55,7 +55,7 @@ export const searchIncidents = async (query: string): Promise<Incident[]> => {
       usuario:usuarios(nombre)
     `)
     .or(`tipo_incidente.ilike.%${query}%,descripcion.ilike.%${query}%`)
-    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
 
   if (error) return []
   return data || []

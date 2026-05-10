@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { Incident } from '../types/incident'
+import { supabase } from '../services/supabaseClient'
 import { getIncidents, updateIncidentStatus, searchIncidents } from '../services/incidentService'
 
 export const useIncidents = () => {
@@ -7,9 +8,24 @@ export const useIncidents = () => {
   const [loading, setLoading] = useState(true)
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
 
-  // Cargar incidentes al iniciar
+  // Cargar incidentes al iniciar y mantener la lista en tiempo real
   useEffect(() => {
     fetchIncidents()
+
+    const channel = supabase
+      .channel('incidentes-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'incidentes' },
+        () => {
+          fetchIncidents()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const fetchIncidents = async () => {

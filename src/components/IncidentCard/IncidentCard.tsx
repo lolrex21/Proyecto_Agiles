@@ -51,7 +51,9 @@ export default function IncidentCard({
           <div>
             <h4 className="font-bold text-sm">{incident.tipo_incidente.toUpperCase()}</h4>
             <p className="text-xs text-gray-500">
-              {new Date(incident.created_at).toLocaleString()}
+              {incident.created_at
+                ? new Date(incident.created_at).toLocaleString()
+                : 'Fecha no disponible'}
             </p>
           </div>
         </div>

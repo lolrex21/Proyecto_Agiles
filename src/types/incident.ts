@@ -8,7 +8,7 @@ export interface Incident {
   estado: 'Pendiente' | 'Atendido' | 'Cerrado'
   latitud?: number
   longitud?: number
-  created_at: string
+  created_at?: string
   usuario?: { nombre: string }
 }
 
