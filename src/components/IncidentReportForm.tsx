@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback, type FormEvent, type ChangeEvent } from 'react'
+import { useState, useRef, useCallback, useEffect, type FormEvent, type ChangeEvent } from 'react'
 import { supabase } from '../services/supabaseClient'
 import { getCurrentUser } from '../services/authService'
+
 
 type IncidentType = '' | 'robo' | 'agresion' | 'vandalismo' | 'sospechoso' | 'accidente' | 'otro'
 
@@ -9,6 +10,8 @@ interface FormData {
   ubicacion: string
   descripcion: string
   foto: File | null
+  latitud?: number
+  longitud?: number
 }
 
 interface FormErrors {
@@ -27,7 +30,11 @@ const INCIDENT_TYPES: { value: IncidentType; label: string }[] = [
   { value: 'otro', label: 'Otro' },
 ]
 
-export default function IncidentReportForm() {
+interface IncidentReportFormProps {
+  onLogout: () => void
+}
+
+export default function IncidentReportForm({ onLogout }: IncidentReportFormProps) {
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     tipo: '',
@@ -35,6 +42,8 @@ export default function IncidentReportForm() {
     descripcion: '',
     foto: null,
   })
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [locationError, setLocationError] = useState('')
   const [errors, setErrors] = useState<FormErrors>({})
   const [fileError, setFileError] = useState('')
   const [submitError, setSubmitError] = useState('')
@@ -56,6 +65,11 @@ export default function IncidentReportForm() {
     if (!formData.tipo) newErrors.tipo = 'Seleccione un tipo de incidente'
     if (!formData.ubicacion.trim()) newErrors.ubicacion = 'Ingrese la ubicación exacta'
     if (!formData.descripcion.trim()) newErrors.descripcion = 'Ingrese una descripción'
+
+    //Agregar validación de coordenadas
+  if (!formData.latitud || !formData.longitud) {
+    newErrors.ubicacion = 'Debe tener ubicación capturada'
+  }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -102,8 +116,8 @@ export default function IncidentReportForm() {
         tipo_incidente: formData.tipo,
         descripcion: `Ubicación: ${formData.ubicacion}\nDescripción: ${formData.descripcion}`,
         estado: 'Pendiente',
-        latitud: null,
-        longitud: null,
+        latitud: formData.latitud,      
+        longitud: formData.longitud,
       },
     ])
 
@@ -183,10 +197,68 @@ export default function IncidentReportForm() {
     setIsHolding(false)
   }, [clearHoldTimer])
 
+  // Nueva función para obtener ubicación
+const getLocation = useCallback(() => {
+  setLocationStatus('loading')
+  setLocationError('')
+
+  if (!navigator.geolocation) {
+    setLocationError('Geolocalización no soportada en tu navegador')
+    setLocationStatus('error')
+    return
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude } = position.coords
+      
+      // Guardar latitud y longitud en el formulario
+      setFormData(prev => ({
+        ...prev,
+        latitud: latitude,
+        longitud: longitude,
+        ubicacion: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}` // Mostrar coords
+      }))
+      
+      setLocationStatus('success')
+    },
+    (error) => {
+      let errorMsg = 'Error al obtener ubicación'
+      
+      if (error.code === error.PERMISSION_DENIED) {
+        errorMsg = 'Permiso de ubicación denegado. Habilítalo en tu navegador.'
+      } else if (error.code === error.POSITION_UNAVAILABLE) {
+        errorMsg = 'Ubicación no disponible'
+      } else if (error.code === error.TIMEOUT) {
+        errorMsg = 'Tiempo de espera agotado'
+      }
+      
+      setLocationError(errorMsg)
+      setLocationStatus('error')
+    }
+  )
+}, [])
+
+// Obtener ubicación al cargar el formulario
+useEffect(() => {
+  if (showForm) {
+    getLocation()
+  }
+}, [showForm, getLocation])
+
   if (submitted) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 animate-fade-in">
         <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm text-center">
+          <div className="text-right mb-4">
+            <button
+              type="button"
+              onClick={onLogout}
+              className="text-sm text-uta-red underline hover:text-uta-red-dark"
+            >
+              Volver al Login
+            </button>
+          </div>
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
@@ -213,6 +285,15 @@ export default function IncidentReportForm() {
   if (!showForm) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] px-6">
+        <div className="text-right w-full max-w-md mb-4">
+          <button
+            type="button"
+            onClick={onLogout}
+            className="text-sm text-uta-red underline hover:text-uta-red-dark"
+          >
+            Volver al Login
+          </button>
+        </div>
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-uta-navy mb-2">¿Presencias algo inusual?</h2>
           <p className="text-gray-600 text-sm">Mantén presionado el botón por 3 segundos para reportar</p>
@@ -311,25 +392,48 @@ export default function IncidentReportForm() {
             {errors.tipo && <p className="text-uta-red text-xs mt-1">{errors.tipo}</p>}
           </div>
 
-          <div>
-            <label htmlFor="ubicacion" className="block text-sm font-semibold text-uta-navy mb-1.5">
-              Ubicación Exacta <span className="text-uta-red">*</span>
-            </label>
+          {/* Campo de ubicación - automático */}
+<div className="mb-4">
+  <label className="block text-sm font-semibold text-gray-700 mb-2">
+    📍 Ubicación
+  </label>
+  
+  <div className="flex gap-2 mb-2">
+    <input
+      type="text"
+      name="ubicacion"
+      value={formData.ubicacion}
+      onChange={handleChange}
+      placeholder="Tu ubicación se cargará automáticamente..."
+      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+      readOnly // No editable, es automático
+    />
+    
+    <button
+      type="button"
+      onClick={getLocation}
+      disabled={locationStatus === 'loading'}
+      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+    >
+      {locationStatus === 'loading' ? '⏳ Obteniendo...' : '📍 Actualizar'}
+    </button>
+  </div>
 
-            <div className="relative">
-              <input
-                type="text"
-                id="ubicacion"
-                name="ubicacion"
-                value={formData.ubicacion}
-                onChange={handleChange}
-                placeholder="Ej: Edificio A, Piso 2, Aula 204"
-                className={`w-full px-3 py-2.5 border-2 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold ${errors.ubicacion ? 'border-uta-red' : 'border-gray-200'}`}
-              />
-            </div>
+  {/* Estado de la ubicación */}
+  {locationStatus === 'success' && (
+    <p className="text-sm text-green-600">
+      ✓ Ubicación capturada: {formData.latitud?.toFixed(4)}, {formData.longitud?.toFixed(4)}
+    </p>
+  )}
 
-            {errors.ubicacion && <p className="text-uta-red text-xs mt-1">{errors.ubicacion}</p>}
-          </div>
+  {locationStatus === 'error' && (
+    <p className="text-sm text-red-600">{locationError}</p>
+  )}
+
+  {errors.ubicacion && (
+    <p className="text-red-500 text-sm mt-1">{errors.ubicacion}</p>
+  )}
+</div>
 
           <div>
             <label htmlFor="descripcion" className="block text-sm font-semibold text-uta-navy mb-1.5">
