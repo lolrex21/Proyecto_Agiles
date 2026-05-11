@@ -10,6 +10,7 @@ export interface Incident {
   longitud?: number
   created_at?: string
   usuario?: { nombre: string }
+  guardia_id?: string
 }
 
 export interface MapMarker {

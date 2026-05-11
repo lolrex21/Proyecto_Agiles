@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { isAuthenticated, getCurrentUser } from './services/authService'
-import LoginForm from './components/LoginForm'
-import IncidentReportForm from './components/IncidentReportForm'
+import LoginForm from './components/Student/LoginForm'
+import IncidentReportForm from './components/Student/IncidentReportForm'
 import GuardDashboard from './components/Guard/GuardDashboard'
 
 function App() {
