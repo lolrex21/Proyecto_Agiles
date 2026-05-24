@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { isAuthenticated, getCurrentUser } from './services/authService'
-import LoginForm from './components/LoginForm'
+import { isAuthenticated, getCurrentUser, logout } from './services/authService'
+import LoginForm from './components/Student/LoginForm'
 import IncidentReportForm from './components/IncidentReportForm'
 import GuardDashboard from './components/Guard/GuardDashboard'
 
