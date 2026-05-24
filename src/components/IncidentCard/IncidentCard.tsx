@@ -13,14 +13,14 @@ export default function IncidentCard({
 }: IncidentCardProps) {
   const getIcon = (tipo: string) => {
     const icons: Record<string, string> = {
-      robo: '🔓',
-      agresion: '⚠️',
-      vandalismo: '🔨',
-      sospechoso: '👁️',
-      accidente: '🚨',
-      otro: '📌',
+      robo: '',
+      agresion: '',
+      vandalismo: '',
+      sospechoso: '',
+      accidente: '',
+      otro: '',
     }
-    return icons[tipo] || '📌'
+    return icons[tipo] || ''
   }
 
   const statusColors: Record<string, string> = {
