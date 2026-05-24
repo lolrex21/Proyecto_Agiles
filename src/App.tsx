@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { isAuthenticated, getCurrentUser } from './services/authService'
-import LoginForm from './components/Student/LoginForm'
-import IncidentReportForm from './components/Student/IncidentReportForm'
+import LoginForm from './components/LoginForm'
+import IncidentReportForm from './components/IncidentReportForm'
 import GuardDashboard from './components/Guard/GuardDashboard'
 
 function App() {
@@ -10,6 +10,11 @@ function App() {
 
   const handleLogin = () => {
     setAuthenticated(true)
+  }
+
+  const handleLogout = () => {
+    logout()
+    setAuthenticated(false)
   }
 
   if (!authenticated) {
@@ -22,7 +27,7 @@ function App() {
   }
 
   // Si es usuario normal, mostrar formulario de reporte
-  return <IncidentReportForm />
+  return <IncidentReportForm onLogout={handleLogout} />
 }
 
 export default App
