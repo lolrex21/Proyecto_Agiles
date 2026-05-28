@@ -138,7 +138,7 @@ export default function TrustGroupForm({ onSuccess }: TrustGroupFormProps) {
                 name="descripcion"
                 value={formData.descripcion}
                 onChange={handleChange}
-                placeholder="Ej: Grupo para coordinar seguridad en el dormitorio A"
+                placeholder="Ej: Grupo para coordinar seguridad de los panas"
                 rows={3}
                 className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold"
               />
