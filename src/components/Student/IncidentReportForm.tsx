@@ -7,9 +7,11 @@ import {
   type ChangeEvent,
 } from 'react'
 import Header from '../Header'
+import Toast from '../Toast'
 import { supabase } from '../../services/supabaseClient'
 import { getCurrentUser } from '../../services/authService'
 import { emergencySocket } from '../../services/emergencySocket'
+import { getUserTrustGroups, notifyGroupMembers } from '../../services/trustGroupService'
 
 type IncidentType =
   | ''
@@ -113,6 +115,8 @@ export default function IncidentReportForm() {
   const [submitted, setSubmitted] = useState(false)
   const [holdProgress, setHoldProgress] = useState(0)
   const [isHolding, setIsHolding] = useState(false)
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' } | null>(null)
+  const [activeIncidentId, setActiveIncidentId] = useState<number | null>(null)
 
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const animationFrameRef = useRef<number | null>(null)
@@ -234,11 +238,30 @@ export default function IncidentReportForm() {
         return
       }
 
-      emergencySocket.createIncident(newIncident)
+emergencySocket.createIncident(newIncident)
 
-      resetForm()
-      setShowForm(false)
-      setSubmitted(true)
+// Notificar automáticamente a los grupos de confianza del usuario
+if (user?.id) {
+  const userId = Number(user.id)
+  const userGroups = await getUserTrustGroups(userId)
+for (const group of userGroups) {
+  const notificationMessage =
+    `🚨 ${user?.nombre || 'Un usuario'} reportó un incidente en el grupo ${group.nombre}\n` +
+    `Tipo: ${formData.tipo.toUpperCase()}\n` +
+    `Ubicación: ${formData.ubicacion}`
+
+  await notifyGroupMembers(
+    Number(group.id),
+    Number(newIncident.id),
+    userId,
+    notificationMessage
+  )
+}
+}
+
+resetForm()
+setShowForm(false)
+setSubmitted(true)
     } catch (error) {
       const message =
         error instanceof Error
@@ -300,17 +323,49 @@ export default function IncidentReportForm() {
     setIsHolding(false)
   }, [clearHoldTimer])
 
+  const handleIncidentUpdated = useCallback((payload: any) => {
+    console.log('[STUDENT] handleIncidentUpdated called', payload)
+    console.log('[STUDENT] Active ID:', activeIncidentId, 'Payload ID:', payload.incidentId)
+
+    if (String(payload.incidentId) === String(activeIncidentId)) {
+      const message =
+        payload.status === 'Atendido'
+          ? 'Guardia UTA en camino'
+          : 'Caso cerrado'
+
+      setToast({
+        message,
+        type: payload.status === 'Cerrado' ? 'success' : 'info',
+      })
+
+      if (payload.status === 'Cerrado') {
+        setActiveIncidentId(null)
+        setSubmitted(false)
+        setShowForm(false)
+      }
+
+      setTimeout(() => setToast(null), 4000)
+    }
+  }, [activeIncidentId])
+
+  useEmergencySocket({
+    role: 'affected',
+    userId: String(getCurrentUser()?.id ?? ''),
+    onIncidentUpdated: handleIncidentUpdated,
+  })
+
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gray-100">
+      <div className="max-w-md mx-auto min-h-screen relative bg-gray-50 flex flex-col shadow-2xl overflow-x-hidden">
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         <Header />
 
-        <main className="flex flex-col items-center justify-center min-h-[70vh] px-6 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
+        <main className="flex flex-col items-center justify-center flex-1 px-4 py-8 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-lg p-6 w-full text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="w-10 h-10 text-green-600"
+                className="w-8 h-8 text-green-600"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -322,7 +377,7 @@ export default function IncidentReportForm() {
               </svg>
             </div>
 
-            <h2 className="text-xl font-bold text-uta-navy mb-2">
+            <h2 className="text-lg font-bold text-uta-navy mb-2">
               ¡Reporte Enviado!
             </h2>
 
@@ -333,7 +388,7 @@ export default function IncidentReportForm() {
 
             <button
               onClick={handleNewReport}
-              className="w-full py-3 px-6 bg-uta-gold hover:bg-uta-gold-dark text-uta-navy font-bold rounded-lg transition-colors duration-200"
+              className="w-full py-3 px-4 bg-uta-gold hover:bg-uta-gold-dark text-uta-navy font-bold text-sm rounded-lg transition-colors duration-200"
             >
               Reportar Otro Incidente
             </button>
@@ -345,12 +400,13 @@ export default function IncidentReportForm() {
 
   if (!showForm) {
     return (
-      <div className="min-h-screen bg-gray-100">
+      <div className="max-w-md mx-auto min-h-screen relative bg-gray-50 flex flex-col shadow-2xl overflow-x-hidden">
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         <Header />
 
-        <main className="flex flex-col items-center justify-start pt-8 px-6">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-uta-navy mb-2">
+        <main className="flex flex-col items-center justify-center flex-1 px-4 py-6">
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-bold text-uta-navy mb-2">
               ¿Presencias algo inusual?
             </h2>
 
@@ -359,8 +415,8 @@ export default function IncidentReportForm() {
             </p>
           </div>
 
-          <div className="relative flex items-center justify-center">
-            <svg className="absolute w-56 h-56 -rotate-90" viewBox="0 0 200 200">
+          <div className="relative flex items-center justify-center w-56 h-56 mx-auto">
+            <svg className="absolute w-56 h-56 -rotate-90 pointer-events-none" viewBox="0 0 200 200">
               <circle
                 cx="100"
                 cy="100"
@@ -370,17 +426,19 @@ export default function IncidentReportForm() {
                 strokeWidth="6"
               />
 
-              <circle
-                cx="100"
-                cy="100"
-                r={BUTTON_RADIUS}
-                fill="none"
-                stroke="#FFBD00"
-                strokeWidth="6"
-                strokeLinecap="round"
-                strokeDasharray={CIRCUMFERENCE}
-                strokeDashoffset={CIRCUMFERENCE * (1 - holdProgress)}
-              />
+              {holdProgress > 0 && (
+                <circle
+                  cx="100"
+                  cy="100"
+                  r={BUTTON_RADIUS}
+                  fill="none"
+                  stroke="#FFBD00"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  strokeDasharray={CIRCUMFERENCE}
+                  strokeDashoffset={CIRCUMFERENCE * (1 - holdProgress)}
+                />
+              )}
             </svg>
 
             <button
@@ -393,33 +451,25 @@ export default function IncidentReportForm() {
               }}
               onTouchEnd={cancelHold}
               onTouchCancel={cancelHold}
-              className={`relative w-48 h-48 rounded-full bg-uta-red text-white font-bold text-lg shadow-xl flex flex-col items-center justify-center gap-2 select-none touch-none ${
-                isHolding
-                  ? 'bg-uta-red-dark scale-105'
-                  : 'hover:bg-uta-red-dark hover:shadow-2xl hover:scale-105 active:scale-95'
-              } transition-all duration-150`}
+              className={`w-56 h-56 rounded-full bg-red-600 text-white font-bold text-xl flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.6)] hover:bg-red-700 active:scale-95 transition-all mx-auto text-center p-4 select-none touch-none focus:outline-none focus:ring-0 ${
+                isHolding ? 'bg-red-700 scale-105' : 'hover:shadow-2xl hover:scale-105'
+              }`}
               aria-label="Mantén presionado para reportar emergencia"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="w-12 h-12"
+                className="w-10 h-10"
                 viewBox="0 0 24 24"
                 fill="currentColor"
               >
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
               </svg>
 
-              <span className="leading-tight">
+              <span className="leading-tight text-sm px-2 text-center">
                 ¡REPORTAR
                 <br />
                 EMERGENCIA!
               </span>
-
-              {isHolding && (
-                <span className="text-xs font-mono mt-1 opacity-80">
-                  {Math.round(holdProgress * 100)}%
-                </span>
-              )}
             </button>
           </div>
         </main>
@@ -428,28 +478,29 @@ export default function IncidentReportForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="max-w-md mx-auto min-h-screen relative bg-gray-50 flex flex-col shadow-2xl overflow-x-hidden">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <Header />
 
-      <main className="px-4 py-6 max-w-md mx-auto">
+      <main className="flex-1 px-4 py-4">
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="bg-uta-red px-4 py-4">
-            <h2 className="text-white text-lg font-bold text-center">
+          <div className="bg-uta-red px-4 py-3">
+            <h2 className="text-white text-base font-bold text-center">
               Reportar Incidente
             </h2>
           </div>
 
           {submitError && (
-            <div className="mx-5 mt-4 p-3 bg-red-50 border border-uta-red rounded-lg">
-              <p className="text-uta-red text-sm font-medium">{submitError}</p>
+            <div className="mx-4 mt-3 p-2 bg-red-50 border border-uta-red rounded-lg">
+              <p className="text-uta-red text-xs font-medium">{submitError}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="p-5 space-y-5" noValidate>
+          <form onSubmit={handleSubmit} className="p-4 space-y-4" noValidate>
             <div>
               <label
                 htmlFor="tipo"
-                className="block text-sm font-semibold text-uta-navy mb-1.5"
+                className="block text-sm font-semibold text-uta-navy mb-1"
               >
                 Tipo de Incidente <span className="text-uta-red">*</span>
               </label>
@@ -459,7 +510,7 @@ export default function IncidentReportForm() {
                 name="tipo"
                 value={formData.tipo}
                 onChange={handleChange}
-                className={`w-full px-3 py-2.5 border-2 rounded-lg text-sm bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold ${
+                className={`w-full px-3 py-2 border-2 rounded-lg text-sm bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold ${
                   errors.tipo ? 'border-uta-red' : 'border-gray-200'
                 }`}
               >
@@ -482,7 +533,7 @@ export default function IncidentReportForm() {
             <div>
               <label
                 htmlFor="ubicacion"
-                className="block text-sm font-semibold text-uta-navy mb-1.5"
+                className="block text-sm font-semibold text-uta-navy mb-1"
               >
                 Ubicación Exacta <span className="text-uta-red">*</span>
               </label>
@@ -494,7 +545,7 @@ export default function IncidentReportForm() {
                 value={formData.ubicacion}
                 onChange={handleChange}
                 placeholder="Ej: Edificio A, Piso 2, Aula 204"
-                className={`w-full px-3 py-2.5 border-2 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold ${
+                className={`w-full px-3 py-2 border-2 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold ${
                   errors.ubicacion ? 'border-uta-red' : 'border-gray-200'
                 }`}
               />
@@ -507,7 +558,7 @@ export default function IncidentReportForm() {
             <div>
               <label
                 htmlFor="descripcion"
-                className="block text-sm font-semibold text-uta-navy mb-1.5"
+                className="block text-sm font-semibold text-uta-navy mb-1"
               >
                 Descripción <span className="text-uta-red">*</span>
               </label>
@@ -517,9 +568,9 @@ export default function IncidentReportForm() {
                 name="descripcion"
                 value={formData.descripcion}
                 onChange={handleChange}
-                rows={4}
+                rows={3}
                 placeholder="Describe lo que está sucediendo..."
-                className={`w-full px-3 py-2.5 border-2 rounded-lg text-sm resize-none transition-colors focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold ${
+                className={`w-full px-3 py-2 border-2 rounded-lg text-sm resize-none transition-colors focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold ${
                   errors.descripcion ? 'border-uta-red' : 'border-gray-200'
                 }`}
               />
@@ -534,7 +585,7 @@ export default function IncidentReportForm() {
             <div>
               <label
                 htmlFor="foto"
-                className="block text-sm font-semibold text-uta-navy mb-1.5"
+                className="block text-sm font-semibold text-uta-navy mb-1"
               >
                 Adjuntar Foto{' '}
                 <span className="text-gray-400 font-normal">(opcional)</span>
@@ -542,23 +593,23 @@ export default function IncidentReportForm() {
 
               <label
                 htmlFor="foto"
-                className="flex flex-col items-center justify-center w-full py-6 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-uta-gold hover:bg-uta-gray/50 transition-colors"
+                className="flex flex-col items-center justify-center w-full py-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-uta-gold hover:bg-uta-gray/50 transition-colors"
               >
                 {formData.foto ? (
                   <>
-                    <span className="text-sm text-gray-700 font-medium">
+                    <span className="text-xs text-gray-700 font-medium truncate px-2">
                       {formData.foto.name}
                     </span>
-                    <span className="text-xs text-gray-400 mt-0.5">
+                    <span className="text-[10px] text-gray-400 mt-0.5">
                       Click para cambiar
                     </span>
                   </>
                 ) : (
                   <>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-xs text-gray-500">
                       Tap para subir foto
                     </span>
-                    <span className="text-xs text-gray-400 mt-0.5">
+                    <span className="text-[10px] text-gray-400 mt-0.5">
                       PNG, JPG hasta 5MB
                     </span>
                   </>
@@ -579,12 +630,12 @@ export default function IncidentReportForm() {
               )}
             </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-3 pt-1">
               <button
                 type="button"
                 onClick={handleCancel}
                 disabled={isSubmitting}
-                className="flex-1 py-3 px-4 border-2 border-gray-300 text-gray-700 font-bold text-sm rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="flex-1 py-2.5 px-3 border-2 border-gray-300 text-gray-700 font-bold text-xs rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 CANCELAR
               </button>
@@ -592,7 +643,7 @@ export default function IncidentReportForm() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex-1 py-3 px-4 bg-uta-red hover:bg-uta-red-dark text-white font-bold text-sm rounded-lg transition-colors disabled:opacity-70"
+                className="flex-1 py-2.5 px-3 bg-uta-red hover:bg-uta-red-dark text-white font-bold text-xs rounded-lg transition-colors disabled:opacity-70"
               >
                 {isSubmitting ? 'Obteniendo ubicación...' : 'ENVIAR REPORTE'}
               </button>

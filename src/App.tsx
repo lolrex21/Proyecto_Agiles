@@ -16,6 +16,12 @@ import NotificationBell from './components/NotificationBell'
 
 type MainTab = 'reportar' | 'grupos'
 
+import TrustGroupForm from './components/TrustGroupForm'
+import TrustGroupList from './components/TrustGroupList'
+import NotificationBell from './components/NotificationBell'
+
+type MainTab = 'reportar' | 'grupos'
+
 function App() {
   const [authenticated, setAuthenticated] = useState(isAuthenticated())
   const [checkingSession, setCheckingSession] = useState(true)
