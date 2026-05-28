@@ -23,9 +23,21 @@ export const createTrustGroup = async (
       .select()
       .single()
 
-    if (error || !group) return { success: false, message: 'No se pudo crear el grupo.' }
+    if (error || !group) {
+      return { success: false, message: error?.message || 'No se pudo crear el grupo.' }
+    }
 
-    await addMemberByUserId(group.id, userId, 'admin')
+    // Te agregamos como admin. Si esto falla, el grupo no aparecería en tu lista,
+    // así que borramos el grupo huérfano y devolvemos el error real.
+    const memberResult = await addMemberByUserId(group.id, userId, 'admin')
+
+    if (!memberResult.success) {
+      await supabase.from('grupos_confianza').delete().eq('id', group.id)
+      return {
+        success: false,
+        message: `El grupo no se pudo registrar para tu usuario: ${memberResult.message}`,
+      }
+    }
 
     return { success: true, message: 'Grupo creado exitosamente.', data: group }
   } catch (error) {
