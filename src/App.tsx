@@ -12,6 +12,7 @@ function App() {
     setAuthenticated(true)
   }
 
+
   if (!authenticated) {
     return <LoginForm onLogin={handleLogin} />
   }
