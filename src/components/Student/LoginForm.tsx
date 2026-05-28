@@ -1,8 +1,15 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import { initDemoUser, isAuthenticated, loginUser, registerUser } from '../../services/authService'
+import {
+  initDemoUser,
+  isAuthenticated,
+  loginUser,
+  registerUser,
+  signInWithGoogle,
+} from '../../services/authService'
 
 interface LoginFormProps {
   onLogin: () => void
+  initialMessage?: string
 }
 
 interface LoginErrors {
@@ -15,10 +22,10 @@ const defaultFormState = {
   password: '',
 }
 
-export default function LoginForm({ onLogin }: LoginFormProps) {
+export default function LoginForm({ onLogin, initialMessage = '' }: LoginFormProps) {
   const [credentials, setCredentials] = useState(defaultFormState)
   const [errors, setErrors] = useState<LoginErrors>({})
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(initialMessage)
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<'login' | 'register'>('login')
 
@@ -77,6 +84,18 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
     onLogin()
   }
 
+  const handleGoogleLogin = async () => {
+  setMessage('')
+  setLoading(true)
+
+  const result = await signInWithGoogle()
+
+  if (!result.success) {
+    setLoading(false)
+    setMessage(result.message)
+  }
+}
+
   // Cambia entre el modo de login y registro.
   const toggleMode = () => {
     setMode(prev => (prev === 'login' ? 'register' : 'login'))
@@ -102,6 +121,20 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
             ? 'Ingresa tus credenciales de forma segura.'
             : 'Crea una cuenta con contraseña segura y cifrada.'}
         </p>
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          className="mb-4 w-full rounded-xl sm:rounded-2xl border-2 border-gray-200 bg-white px-4 py-4 sm:py-5 text-sm sm:text-base font-bold text-uta-navy transition duration-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 active:scale-95"
+        >
+          {loading ? 'Conectando con Google...' : 'Continuar con Gmail'}
+        </button>
+
+        <div className="mb-4 flex items-center gap-3">
+          <div className="h-px flex-1 bg-gray-200" />
+          <span className="text-xs font-semibold uppercase text-gray-400">o</span>
+          <div className="h-px flex-1 bg-gray-200" />
+        </div>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4 sm:space-y-5">
           <div>
