@@ -15,6 +15,7 @@ type UseEmergencySocketParams = {
   onIncidentTaken?: (payload: SocketPayload) => void
   onIncidentClosed?: (payload: SocketPayload) => void
   onGuardBusy?: (payload: SocketPayload) => void
+  onIncidentUpdated?: (payload: SocketPayload) => void
 }
 
 export function useEmergencySocket({
@@ -24,12 +25,14 @@ export function useEmergencySocket({
   onIncidentTaken,
   onIncidentClosed,
   onGuardBusy,
+  onIncidentUpdated,
 }: UseEmergencySocketParams) {
   const handlersRef = useRef({
     onNewIncident,
     onIncidentTaken,
     onIncidentClosed,
     onGuardBusy,
+    onIncidentUpdated,
   })
 
   useEffect(() => {
@@ -38,8 +41,9 @@ export function useEmergencySocket({
       onIncidentTaken,
       onIncidentClosed,
       onGuardBusy,
+      onIncidentUpdated,
     }
-  }, [onNewIncident, onIncidentTaken, onIncidentClosed, onGuardBusy])
+  }, [onNewIncident, onIncidentTaken, onIncidentClosed, onGuardBusy, onIncidentUpdated])
 
   useEffect(() => {
     if (!userId) return
@@ -52,6 +56,7 @@ export function useEmergencySocket({
         onIncidentTaken,
         onIncidentClosed,
         onGuardBusy,
+        onIncidentUpdated,
       } = handlersRef.current
 
       switch (message.type) {
@@ -69,6 +74,10 @@ export function useEmergencySocket({
 
         case 'GUARD_BUSY':
           onGuardBusy?.(message)
+          break
+
+        case 'INCIDENT_UPDATED':
+          onIncidentUpdated?.(message)
           break
 
         default:

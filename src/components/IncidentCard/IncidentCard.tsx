@@ -13,14 +13,14 @@ export default function IncidentCard({
 }: IncidentCardProps) {
   const getIcon = (tipo: string) => {
     const icons: Record<string, string> = {
-      robo: '🔓',
-      agresion: '⚠️',
-      vandalismo: '🔨',
-      sospechoso: '👁️',
-      accidente: '🚨',
-      otro: '📌',
+      robo: '',
+      agresion: '',
+      vandalismo: '',
+      sospechoso: '',
+      accidente: '',
+      otro: '',
     }
-    return icons[tipo] || '📌'
+    return icons[tipo] || ''
   }
 
   const statusColors: Record<string, string> = {
@@ -29,15 +29,8 @@ export default function IncidentCard({
     Cerrado: 'bg-green-100 text-green-800',
   }
 
-  const handleStatusClick = async () => {
-    const nextStatus =
-      incident.estado === 'Pendiente'
-        ? 'Atendido'
-        : incident.estado === 'Atendido'
-        ? 'Cerrado'
-        : 'Pendiente'
-
-    await onStatusUpdate(incident.id, nextStatus)
+  const handleTakeIncident = async () => {
+    await onStatusUpdate(incident.id, 'Atendido')
   }
 
   return (
@@ -65,15 +58,27 @@ export default function IncidentCard({
       <p className="text-sm text-gray-700 mb-2">{incident.descripcion}</p>
       <p className="text-xs text-gray-500 mb-3">Por: {incident.usuario?.nombre}</p>
 
-      {incident.estado !== 'Cerrado' && (
+      {incident.estado === 'Pendiente' && (
         <button
           onClick={(e) => {
             e.stopPropagation()
-            handleStatusClick()
+            handleTakeIncident()
           }}
-          className="w-full px-3 py-2 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700"
+          className="w-full px-3 py-2 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700 transition-colors"
         >
-          {incident.estado === 'Pendiente' ? 'Marcar Atendido' : 'Marcar Cerrado'}
+          Atender Emergencia
+        </button>
+      )}
+
+      {incident.estado === 'Atendido' && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onSelect()
+          }}
+          className="w-full px-3 py-2 border-2 border-gray-300 text-gray-700 text-xs font-bold rounded hover:bg-gray-50 transition-colors"
+        >
+          Ver Detalles
         </button>
       )}
     </div>

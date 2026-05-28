@@ -125,6 +125,37 @@ function handleIncidentClosed(ws, message) {
   })
 }
 
+function handleIncidentUpdated(ws, message) {
+  const meta = clients.get(ws)
+  const { incidentId, status, guardId } = message
+
+  if (!meta || meta.role !== 'guard') {
+    send(ws, {
+      type: 'ERROR',
+      message: 'Solo un guardia puede actualizar alertas',
+    })
+    return
+  }
+
+  if (!incidentId || !status) {
+    send(ws, {
+      type: 'ERROR',
+      message: 'INCIDENT_UPDATED requiere incidentId y status',
+    })
+    return
+  }
+
+  const broadcastPayload = {
+    type: 'INCIDENT_UPDATED',
+    incidentId,
+    status,
+    guardId,
+  }
+
+  console.log('[WS] Broadcasting INCIDENT_UPDATED', broadcastPayload)
+  broadcast(broadcastPayload)
+}
+
 wss.on('connection', (ws) => {
   send(ws, {
     type: 'CONNECTED',
@@ -158,6 +189,10 @@ wss.on('connection', (ws) => {
 
       case 'CLOSE_INCIDENT':
         handleIncidentClosed(ws, message)
+        break
+
+      case 'INCIDENT_UPDATED':
+        handleIncidentUpdated(ws, message)
         break
 
       default:
