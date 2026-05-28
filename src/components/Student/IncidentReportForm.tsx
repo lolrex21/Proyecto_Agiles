@@ -11,7 +11,7 @@ import Toast from '../Toast'
 import { supabase } from '../../services/supabaseClient'
 import { getCurrentUser } from '../../services/authService'
 import { emergencySocket } from '../../services/emergencySocket'
-import { useEmergencySocket } from '../../hooks/useEmergencySocket'
+import { getUserTrustGroups, notifyGroupMembers } from '../../services/trustGroupService'
 
 type IncidentType =
   | ''
@@ -238,14 +238,30 @@ export default function IncidentReportForm() {
         return
       }
 
-      emergencySocket.createIncident(newIncident)
+emergencySocket.createIncident(newIncident)
 
-      console.log('[STUDENT] newIncident.id:', newIncident.id)
-      setActiveIncidentId(newIncident.id)
+// Notificar automáticamente a los grupos de confianza del usuario
+if (user?.id) {
+  const userId = Number(user.id)
+  const userGroups = await getUserTrustGroups(userId)
+for (const group of userGroups) {
+  const notificationMessage =
+    `🚨 ${user?.nombre || 'Un usuario'} reportó un incidente en el grupo ${group.nombre}\n` +
+    `Tipo: ${formData.tipo.toUpperCase()}\n` +
+    `Ubicación: ${formData.ubicacion}`
 
-      resetForm()
-      setShowForm(false)
-      setSubmitted(true)
+  await notifyGroupMembers(
+    Number(group.id),
+    Number(newIncident.id),
+    userId,
+    notificationMessage
+  )
+}
+}
+
+resetForm()
+setShowForm(false)
+setSubmitted(true)
     } catch (error) {
       const message =
         error instanceof Error
