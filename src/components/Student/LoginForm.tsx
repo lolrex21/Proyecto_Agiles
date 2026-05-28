@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import { initDemoUser, isAuthenticated, loginUser, registerUser } from '../services/authService'
+import { initDemoUser, isAuthenticated, loginUser, registerUser } from '../../services/authService'
 
 interface LoginFormProps {
   onLogin: () => void
@@ -114,7 +114,7 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
               type="text"
               value={credentials.username}
               onChange={handleInputChange}
-              placeholder="tu.email@uta.edu.mx"
+              placeholder="tu.email@uta.edu.ec"
               className="w-full rounded-xl sm:rounded-2xl border-2 border-gray-200 px-4 py-3 sm:py-4 text-sm sm:text-base focus:border-uta-gold focus:outline-none focus:ring-2 focus:ring-uta-gold/20 transition"
               autoComplete="username"
             />

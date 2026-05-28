@@ -5,7 +5,10 @@ interface IncidentListProps {
   incidents: Incident[]
   loading: boolean
   onSelect: (incident: Incident) => void
-  onStatusUpdate: (id: number, status: 'Pendiente' | 'Atendido' | 'Cerrado') => Promise<boolean>
+  onStatusUpdate: (
+    id: number,
+    status: 'Pendiente' | 'Atendido' | 'Cerrado'
+  ) => Promise<boolean>
 }
 
 export default function IncidentList({
@@ -19,7 +22,7 @@ export default function IncidentList({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-4">
+    <div className="bg-white rounded-lg p-4">
       <h3 className="text-lg font-bold mb-4 text-gray-900">
         Incidentes cercanos ({incidents.length})
       </h3>
@@ -29,7 +32,7 @@ export default function IncidentList({
           ✓ No hay incidentes reportados
         </p>
       ) : (
-        <div className="space-y-2 max-h-96 overflow-y-auto">
+        <div className="space-y-2">
           {incidents.map((incident) => (
             <IncidentCard
               key={incident.id}
