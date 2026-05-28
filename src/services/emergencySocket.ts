@@ -101,6 +101,15 @@ class EmergencySocket {
     })
   }
 
+  updateIncident(incidentId: string, status: 'Atendido' | 'Cerrado', guardId?: string) {
+    this.send({
+      type: 'INCIDENT_UPDATED',
+      incidentId,
+      status,
+      guardId,
+    })
+  }
+
   closeIncident(
     incidentId: string,
     guardId: string,
