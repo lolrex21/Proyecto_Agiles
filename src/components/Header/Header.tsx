@@ -1,12 +1,13 @@
 import { getCurrentUser, logout } from '../../services/authService'
+import NotificationBell from '../NotificationBell'   // 👈 campana
 import './Header.css'
 
 export default function Header() {
   const user = getCurrentUser()
 
-  const handleLogout = () => {
-    logout()
-    window.location.href = '/'
+ const handleLogout = async () => {
+    await logout()
+    window.location.replace('/')
   }
 
   const userName = user?.nombre || user?.name || 'Usuario'
@@ -31,37 +32,38 @@ export default function Header() {
           </div>
         </div>
 
-        <div className="user-card">
-          <div className="user-avatar">
-            {userName.charAt(0).toUpperCase()}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+          <NotificationBell />   {/* 👈 campana de notificaciones */}
 
-          <div className="user-details">
-            <span className="user-role">
-              {isGuard ? 'Guardia de seguridad' : 'Estudiante'}
-            </span>
+          <div className="user-card">
+            <div className="user-avatar">
+              {userName.charAt(0).toUpperCase()}
+            </div>
 
-            <strong className="user-fullname">
-              {userName}
-            </strong>
-
-            <span className="user-email">
-              {userEmail}
-            </span>
-
-            {isGuard && (
-              <span className="user-zone">
-                Zona: {user?.zona_id || 'Sin asignar'}
+            <div className="user-details">
+              <span className="user-role">
+                {isGuard ? 'Guardia de seguridad' : 'Estudiante'}
               </span>
-            )}
-          </div>
 
-          <button
-            onClick={handleLogout}
-            className="logout-button"
-          >
-            Salir
-          </button>
+              <strong className="user-fullname">
+                {userName}
+              </strong>
+
+              <span className="user-email">
+                {userEmail}
+              </span>
+
+              {isGuard && (
+                <span className="user-zone">
+                  Zona: {user?.zona_id || 'Sin asignar'}
+                </span>
+              )}
+            </div>
+
+            <button onClick={handleLogout} className="logout-button">
+              Salir
+            </button>
+          </div>
         </div>
       </div>
     </header>

@@ -1,5 +1,10 @@
-import { useState } from 'react'
-import { isAuthenticated, getCurrentUser, logout } from './services/authService'
+import { useEffect, useState } from 'react'
+import { supabase } from './services/supabaseClient'
+import {
+  isAuthenticated,
+  getCurrentUser,
+  syncGoogleSession,
+} from './services/authService'
 
 import LoginForm from './components/Student/LoginForm'
 import IncidentReportForm from './components/Student/IncidentReportForm'
@@ -7,104 +12,159 @@ import GuardDashboard from './components/Guard/GuardDashboard'
 
 import TrustGroupForm from './components/TrustGroupForm'
 import TrustGroupList from './components/TrustGroupList'
-import NotificationBell from './components/NotificationBell'
+import Header from './components/Header'
 
 type MainTab = 'reportar' | 'grupos'
 
 function App() {
   const [authenticated, setAuthenticated] = useState(isAuthenticated())
+  const [checkingSession, setCheckingSession] = useState(true)
   const [activeTab, setActiveTab] = useState<MainTab>('reportar')
   const [refreshTrustGroups, setRefreshTrustGroups] = useState(0)
+  const [sessionMessage, setSessionMessage] = useState('')
+  const [currentUser, setCurrentUser] = useState<any>(getCurrentUser())
 
-  const user = getCurrentUser()
+  useEffect(() => {
+    let isMounted = true
+    let handled = false
+
+    const cleanUrlHash = () => {
+      if (window.location.hash) {
+        window.history.replaceState({}, document.title, window.location.pathname)
+      }
+    }
+
+    const applyResult = async (session: any) => {
+      if (handled || !isMounted) return
+      handled = true
+
+      const result = await syncGoogleSession(session)
+      if (!isMounted) return
+
+      if (result.success) {
+        setSessionMessage('')
+        setCurrentUser(getCurrentUser())
+        setAuthenticated(true)
+        cleanUrlHash()
+      } else {
+        handled = false
+        setSessionMessage(result.message)
+        setCurrentUser(null)
+        setAuthenticated(false)
+      }
+
+      setCheckingSession(false)
+    }
+
+    const bootstrap = async () => {
+      if (isAuthenticated()) {
+        setCurrentUser(getCurrentUser())
+        setAuthenticated(true)
+        setCheckingSession(false)
+        return
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!isMounted) return
+
+      if (session) {
+        await applyResult(session)
+      } else {
+        setAuthenticated(false)
+        setCurrentUser(null)
+        setCheckingSession(false)
+      }
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+        void applyResult(session)
+      }
+    })
+
+    void bootstrap()
+
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
 
   const handleLogin = () => {
+    setSessionMessage('')
     setAuthenticated(true)
-  }
-
-  const handleLogout = () => {
-    logout()
-    setAuthenticated(false)
-    setActiveTab('reportar')
+    setCurrentUser(getCurrentUser())
   }
 
   const handleGroupCreated = () => {
     setRefreshTrustGroups(prev => prev + 1)
   }
 
-  // Si no ha iniciado sesión
-  if (!authenticated) {
-    return <LoginForm onLogin={handleLogin} />
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+        <div className="rounded-2xl bg-white px-6 py-5 shadow-lg text-center">
+          <p className="text-sm font-semibold text-uta-navy">
+            Ingresando a tu cuenta...
+          </p>
+        </div>
+      </div>
+    )
   }
 
-  // Si es guardia
-  if (user?.rol === 'guardia') {
+  if (!authenticated) {
+    return <LoginForm onLogin={handleLogin} initialMessage={sessionMessage} />
+  }
+
+  if (currentUser?.rol === 'guardia') {
     return <GuardDashboard />
   }
 
-  // Usuario normal
   return (
     <div className="min-h-screen bg-gray-100">
-      <header className="bg-uta-navy text-white shadow-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div>
-            <h1 className="text-xl font-bold">UTA Security</h1>
-            <p className="text-sm text-white/80">
-              Sistema de acceso seguro y reporte de incidentes
-            </p>
-          </div>
+      <Header />
 
-          <div className="flex items-center gap-3">
-            <NotificationBell />
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <div className="mb-6 flex gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab('reportar')}
+            className={`rounded-xl px-5 py-3 text-sm font-bold transition ${
+              activeTab === 'reportar'
+                ? 'bg-uta-red text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            Reportar emergencia
+          </button>
 
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
-            >
-              Cerrar sesión
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('grupos')}
+            className={`rounded-xl px-5 py-3 text-sm font-bold transition ${
+              activeTab === 'grupos'
+                ? 'bg-uta-red text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            Grupos de confianza
+          </button>
         </div>
-      </header>
 
-      <main className="pb-8">
-        <nav className="sticky top-0 z-10 border-b border-gray-200 bg-white shadow-sm">
-          <div className="mx-auto flex max-w-6xl px-4">
-            <button
-              onClick={() => setActiveTab('reportar')}
-              className={`px-6 py-4 font-semibold border-b-2 transition-colors ${
-                activeTab === 'reportar'
-                  ? 'border-uta-gold text-uta-gold'
-                  : 'border-transparent text-gray-600 hover:text-uta-navy'
-              }`}
-            >
-              🚨 Reportar Incidente
-            </button>
+        {activeTab === 'reportar' && <IncidentReportForm />}
 
-            <button
-              onClick={() => setActiveTab('grupos')}
-              className={`px-6 py-4 font-semibold border-b-2 transition-colors ${
-                activeTab === 'grupos'
-                  ? 'border-uta-gold text-uta-gold'
-                  : 'border-transparent text-gray-600 hover:text-uta-navy'
-              }`}
-            >
-              👥 Grupos de Confianza
-            </button>
+        {activeTab === 'grupos' && currentUser && (
+          <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+            <TrustGroupForm onSuccess={handleGroupCreated} />
+
+            <TrustGroupList refreshTrigger={refreshTrustGroups} />
           </div>
-        </nav>
-
-        <div className="mx-auto max-w-6xl px-4 py-6">
-          {activeTab === 'reportar' && <IncidentReportForm />}
-
-          {activeTab === 'grupos' && (
-            <div className="space-y-6">
-              <TrustGroupForm onSuccess={handleGroupCreated} />
-              <TrustGroupList refreshTrigger={refreshTrustGroups} />
-            </div>
-          )}
-        </div>
+        )}
       </main>
     </div>
   )
