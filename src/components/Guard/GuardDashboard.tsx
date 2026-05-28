@@ -50,7 +50,7 @@ export default function GuardDashboard() {
 
   const activeIncidents = useMemo(() => {
     return visibleIncidents.filter(
-      (inc: any) => inc.estado !== 'Cerrado'
+      (inc: any) => inc.estado !== 'Cerrado' && inc.estado !== 'Cancelado'
     )
   }, [visibleIncidents])
 
@@ -311,24 +311,32 @@ export default function GuardDashboard() {
   )
 
   const handleNewSocketIncident = useCallback(
-  (incident: any) => {
-    const cleanIncident = sanitizeIncident({
-      ...incident,
-      estado: incident.estado || 'Pendiente',
-    })
-
-    upsertLocalIncident(cleanIncident)
-
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Nueva emergencia', {
-        body:
-          cleanIncident.descripcion ||
-          'Se ha reportado una nueva emergencia',
+    (incident: any) => {
+      const cleanIncident = sanitizeIncident({
+        ...incident,
+        estado: incident.estado || 'Pendiente',
       })
-    }
-  },
-  [sanitizeIncident, upsertLocalIncident]
-)
+
+      const incidentId = String(cleanIncident.id)
+      const yaConocido =
+        activeAlerts.some((i) => String(i.id) === incidentId) ||
+        incidents.some((i: any) => String(i.id) === incidentId)
+
+      upsertLocalIncident(cleanIncident)
+
+      if (
+        cleanIncident.estado === 'Pendiente' &&
+        !yaConocido &&
+        'Notification' in window &&
+        Notification.permission === 'granted'
+      ) {
+        new Notification('Nueva emergencia', {
+          body: cleanIncident.descripcion || 'Se ha reportado una nueva emergencia',
+        })
+      }
+    },
+    [activeAlerts, incidents, sanitizeIncident, upsertLocalIncident]
+  )
 
 const handleSocketIncidentTaken = useCallback(
   ({ incidentId, guardId: assignedGuardId, incident }: any) => {

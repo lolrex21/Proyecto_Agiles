@@ -113,8 +113,7 @@ const handleMarkGroupRead = useCallback(
       <button
         type="button"
         onClick={handleTogglePanel}
-        className="relative rounded-full border border-white/30 bg-white/10 p-2 text-white transition hover:bg-white/20"
-      >
+        className="relative rounded-full border border-gray-200 bg-white p-2 text-uta-navy shadow-sm transition hover:bg-gray-50"      >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 01-3.46 0" />

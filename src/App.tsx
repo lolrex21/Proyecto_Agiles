@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
+import { supabase } from './services/supabaseClient'
 import {
   isAuthenticated,
   getCurrentUser,
-  logout,
   syncGoogleSession,
 } from './services/authService'
 
@@ -12,13 +12,7 @@ import GuardDashboard from './components/Guard/GuardDashboard'
 
 import TrustGroupForm from './components/TrustGroupForm'
 import TrustGroupList from './components/TrustGroupList'
-import NotificationBell from './components/NotificationBell'
-
-type MainTab = 'reportar' | 'grupos'
-
-import TrustGroupForm from './components/TrustGroupForm'
-import TrustGroupList from './components/TrustGroupList'
-import NotificationBell from './components/NotificationBell'
+import Header from './components/Header'
 
 type MainTab = 'reportar' | 'grupos'
 
@@ -28,39 +22,83 @@ function App() {
   const [activeTab, setActiveTab] = useState<MainTab>('reportar')
   const [refreshTrustGroups, setRefreshTrustGroups] = useState(0)
   const [sessionMessage, setSessionMessage] = useState('')
-
-  const user = getCurrentUser()
+  const [currentUser, setCurrentUser] = useState<any>(getCurrentUser())
 
   useEffect(() => {
-    const checkSession = async () => {
-      if (isAuthenticated()) {
-        setCheckingSession(false)
-        return
-      }
+    let isMounted = true
+    let handled = false
 
-      const result = await syncGoogleSession()
+    const cleanUrlHash = () => {
+      if (window.location.hash) {
+        window.history.replaceState({}, document.title, window.location.pathname)
+      }
+    }
+
+    const applyResult = async (session: any) => {
+      if (handled || !isMounted) return
+      handled = true
+
+      const result = await syncGoogleSession(session)
+      if (!isMounted) return
 
       if (result.success) {
+        setSessionMessage('')
+        setCurrentUser(getCurrentUser())
         setAuthenticated(true)
+        cleanUrlHash()
       } else {
+        handled = false
         setSessionMessage(result.message)
+        setCurrentUser(null)
+        setAuthenticated(false)
       }
 
       setCheckingSession(false)
     }
 
-    checkSession()
+    const bootstrap = async () => {
+      if (isAuthenticated()) {
+        setCurrentUser(getCurrentUser())
+        setAuthenticated(true)
+        setCheckingSession(false)
+        return
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!isMounted) return
+
+      if (session) {
+        await applyResult(session)
+      } else {
+        setAuthenticated(false)
+        setCurrentUser(null)
+        setCheckingSession(false)
+      }
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+        void applyResult(session)
+      }
+    })
+
+    void bootstrap()
+
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const handleLogin = () => {
     setSessionMessage('')
     setAuthenticated(true)
-  }
-
-  const handleLogout = async () => {
-    await logout()
-    setAuthenticated(false)
-    setActiveTab('reportar')
+    setCurrentUser(getCurrentUser())
   }
 
   const handleGroupCreated = () => {
@@ -83,44 +121,13 @@ function App() {
     return <LoginForm onLogin={handleLogin} initialMessage={sessionMessage} />
   }
 
-  if (user?.rol === 'guardia') {
+  if (currentUser?.rol === 'guardia') {
     return <GuardDashboard />
   }
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <header className="bg-uta-navy text-white shadow-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div>
-            <h1 className="text-xl font-bold">UTA Security</h1>
-            <p className="text-sm text-white/80">
-              Sistema de acceso seguro y reporte de incidentes
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {user && (
-              <NotificationBell
-                userId={user.id}
-                userRole={user.rol || 'usuario'}
-              />
-            )}
-
-            <div className="text-right">
-              <p className="font-semibold">{user?.nombre}</p>
-              <p className="text-xs text-white/70">{user?.correo}</p>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20"
-            >
-              Cerrar sesión
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       <main className="mx-auto max-w-6xl px-6 py-8">
         <div className="mb-6 flex gap-3">
@@ -151,17 +158,11 @@ function App() {
 
         {activeTab === 'reportar' && <IncidentReportForm />}
 
-        {activeTab === 'grupos' && user && (
+        {activeTab === 'grupos' && currentUser && (
           <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
-            <TrustGroupForm
-              ownerId={user.id}
-              onGroupCreated={handleGroupCreated}
-            />
+            <TrustGroupForm onSuccess={handleGroupCreated} />
 
-            <TrustGroupList
-              userId={user.id}
-              refreshKey={refreshTrustGroups}
-            />
+            <TrustGroupList refreshTrigger={refreshTrustGroups} />
           </div>
         )}
       </main>
