@@ -11,6 +11,8 @@ export interface Incident {
   created_at?: string
   usuario?: { nombre: string }
   guardia_id?: string
+  zona_id?: number
+  zona?: { id: number; nombre: string }
 }
 
 export interface MapMarker {

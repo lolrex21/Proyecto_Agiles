@@ -9,6 +9,8 @@ import { emergencySocket } from '../../services/emergencySocket'
 import { supabase } from '../../services/supabaseClient'
 import { getCurrentUser } from '../../services/authService'
 import './GuardDashboard.css'
+import { usePolygons } from '../../hooks/usePolygons'
+import ZoneLegend from '../Map/ZoneLegend'
 
 type IncidentStatus = 'Pendiente' | 'Atendido' | 'Cerrado'
 
@@ -371,6 +373,8 @@ const handleGuardBusy = useCallback((payload: any) => {
   onGuardBusy: handleGuardBusy,
 })
 
+const { zones } = usePolygons()
+
   return (
     <div className="guard-dashboard">
       <Header />
@@ -424,6 +428,7 @@ const handleGuardBusy = useCallback((payload: any) => {
                   loading={loading}
                   onMarkerClick={setSelectedIncident}
                 />
+                <ZoneLegend zones={zones} />
               </div>
             </article>
           )}
