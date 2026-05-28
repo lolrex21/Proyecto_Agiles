@@ -20,7 +20,14 @@ export default function NotificationPanel({
   onMarkGroupRead,
 }: NotificationPanelProps) {
   return (
-    <div className="absolute right-0 top-full mt-3 w-96 max-w-[90vw] rounded-2xl border border-gray-200 bg-white shadow-2xl z-[9999] overflow-hidden">
+<div className="
+  fixed left-1/2 top-20 z-[9999]
+  w-[92vw] max-w-[360px]
+  -translate-x-1/2
+  rounded-2xl border border-gray-200 bg-white
+  shadow-2xl overflow-hidden
+  sm:absolute sm:right-0 sm:left-auto sm:top-full sm:mt-3 sm:w-96 sm:max-w-[90vw] sm:translate-x-0
+">
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
         <div>
           <p className="text-sm font-semibold text-uta-navy">Notificaciones</p>
@@ -31,7 +38,7 @@ export default function NotificationPanel({
         </button>
       </div>
 
-      <div className="max-h-[420px] overflow-y-auto space-y-4 p-4">
+      <div className="max-h-[70vh] overflow-y-auto space-y-4 p-4">
         <section>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-uta-navy">Solicitudes de Grupo</h3>
