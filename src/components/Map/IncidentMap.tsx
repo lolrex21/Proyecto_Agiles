@@ -78,7 +78,7 @@ export default function IncidentMap({
   const [guardPosts,        setGuardPosts]        = useState<GuardPost[]>([])
 
   // A-18: hook de ubicación del usuario
-  const { location, status, errorMsg, requestLocation } = useUserLocation()
+  const { location, status, errorMsg, requestLocation, startWatching, stopWatching } = useUserLocation()
 
   const { zones } = usePolygons()
 
@@ -113,7 +113,12 @@ export default function IncidentMap({
 
     assignZones()
   }, [incidents])
-
+  // Iniciar seguimiento continuo al montar el componente
+  useEffect(() => {
+    startWatching()
+    return () => stopWatching()
+  }, [startWatching, stopWatching]
+)
   // ── A-18.3 + A-18.4: cuando se obtiene ubicación, centrar mapa y notificar ──
   useEffect(() => {
     if (status === 'success' && location && mapRef.current) {
