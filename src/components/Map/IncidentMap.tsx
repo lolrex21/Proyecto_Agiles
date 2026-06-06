@@ -96,7 +96,7 @@ export default function IncidentMap({
         lat: Number(incident.latitud),
         lng: Number(incident.longitud),
       })
-      mapRef.current.setZoom(19)
+      mapRef.current.setZoom(21)
     }
 
     onMarkerClick?.(incident)
@@ -110,7 +110,7 @@ export default function IncidentMap({
     if (mapRef.current && zone.coordenadas.length > 0) {
       const center = getPolygonCenter(zone.coordenadas)
       mapRef.current.panTo(center)
-      mapRef.current.setZoom(18)
+      mapRef.current.setZoom(20)
     }
   }
 
