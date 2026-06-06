@@ -131,7 +131,10 @@ export default function IncidentMap({
       mapRef.current.panTo({ lat: location.lat, lng: location.lng })
       mapRef.current.setZoom(19)
       onLocationDetected?.(location.lat, location.lng)
-    }
+    } else if (status === 'success' && location) {
+    // Solo notifica al padre sin mover el mapa
+    onLocationDetected?.(location.lat, location.lng)
+  }
   }, [status, location, onLocationDetected])
 
   const onMapLoad = useCallback((map: google.maps.Map) => {
@@ -371,7 +374,7 @@ export default function IncidentMap({
             {location.accuracy && location.accuracy < 200 && (
               <Circle
                 center={{ lat: location.lat, lng: location.lng }}
-                radius={location.accuracy}
+                radius={Math.min(location.accuracy, 50)}
                 options={{
                   strokeColor:   '#4285F4',
                   strokeOpacity: 0.4,

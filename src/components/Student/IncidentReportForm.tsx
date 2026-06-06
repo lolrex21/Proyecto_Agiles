@@ -81,7 +81,7 @@ function getCurrentLocation(): Promise<CurrentLocation> {
         }
         reject(new Error('No se pudo obtener tu ubicación actual.'))
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     )
   })
 }
