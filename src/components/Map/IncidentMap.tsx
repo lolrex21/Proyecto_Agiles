@@ -1,6 +1,6 @@
 import {
   GoogleMap,
-  LoadScript,
+  useJsApiLoader,
   Marker,
   InfoWindow,
   Polygon,
@@ -24,7 +24,6 @@ interface IncidentMapProps {
   incidents:           Incident[]
   loading:             boolean
   onMarkerClick?:      (incident: Incident) => void
-  /** A-18.4: notifica la ubicación al componente padre para usarla al reportar */
   onLocationDetected?: (lat: number, lng: number) => void
 }
 
@@ -49,7 +48,7 @@ const USER_ICON_SVG =
   '</svg>'
 const userIconUrl = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(USER_ICON_SVG)}`
 
-// ─── Colores de incidente ────────────────────────────────────
+// ─── Colores de incidente ─────────────────────────────────────
 const INCIDENT_COLORS: Record<string, string> = {
   robo:       '#FF0000',
   agresion:   '#FF6600',
@@ -77,6 +76,12 @@ export default function IncidentMap({
   const [incidentsWithZone, setIncidentsWithZone] = useState<Incident[]>([])
   const [guardPosts,        setGuardPosts]        = useState<GuardPost[]>([])
 
+  // ── Carga la API de Google Maps UNA SOLA VEZ (no se remonta al re-renderizar) ──
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string,
+    id: 'google-map-script',
+  })
+
   // A-18: hook de ubicación del usuario
   const { location, status, errorMsg, requestLocation, startWatching, stopWatching } = useUserLocation()
 
@@ -86,6 +91,12 @@ export default function IncidentMap({
   useEffect(() => {
     getGuardPostsFromDB().then(setGuardPosts)
   }, [])
+
+  // ── Iniciar seguimiento continuo al montar ────────────────
+  useEffect(() => {
+    startWatching()
+    return () => stopWatching()
+  }, [startWatching, stopWatching])
 
   // ── Asignar zona a cada incidente automáticamente ─────────
   useEffect(() => {
@@ -113,12 +124,7 @@ export default function IncidentMap({
 
     assignZones()
   }, [incidents])
-  // Iniciar seguimiento continuo al montar el componente
-  useEffect(() => {
-    startWatching()
-    return () => stopWatching()
-  }, [startWatching, stopWatching]
-)
+
   // ── A-18.3 + A-18.4: cuando se obtiene ubicación, centrar mapa y notificar ──
   useEffect(() => {
     if (status === 'success' && location && mapRef.current) {
@@ -161,22 +167,34 @@ export default function IncidentMap({
     }
   }
 
-  if (loading) {
+  // ── Guards de carga ───────────────────────────────────────
+  if (loadError) {
     return (
-      <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-        ⏳ Cargando mapa...
+      <div className="w-full h-full bg-gray-200 flex items-center justify-center text-red-600">
+        ❌ Error al cargar Google Maps. Verifica tu API key.
       </div>
     )
   }
 
-  // Filtrar incidentes cerrados (no se muestran en mapa)
+  if (!isLoaded || loading) {
+    return (
+      <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+        <div className="map-loader">
+          <div className="spinner" />
+          <p>Cargando mapa...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Filtrar incidentes cerrados ───────────────────────────
   const incidentsOnMap = incidentsWithZone.filter((inc) => {
     const lat = Number(inc.latitud)
     const lng = Number(inc.longitud)
     return !Number.isNaN(lat) && !Number.isNaN(lng) && inc.estado !== 'Cerrado'
   })
 
-  // ── Botón de ubicación: estado del título ─────────────────
+  // ── Botón de ubicación: título ────────────────────────────
   const locationBtnTitle =
     status === 'loading' ? 'Obteniendo ubicación…' :
     status === 'success' ? 'Centrar en mi ubicación' :
@@ -197,7 +215,7 @@ export default function IncidentMap({
         </div>
       )}
 
-      {/* ── A-18.1: Botón flotante "Mi ubicación" ─────────── */}
+      {/* ── Botón flotante "Mi ubicación" ─────────────────── */}
       <button
         className={`location-fab${status === 'loading' ? ' loading' : ''}${status === 'denied' || status === 'error' ? ' error' : ''}${status === 'success' ? ' active' : ''}`}
         onClick={requestLocation}
@@ -217,166 +235,162 @@ export default function IncidentMap({
         }
       </button>
 
-      {/* ── A-18.5: Toast de error de ubicación ───────────── */}
+      {/* ── Toast de error de ubicación ───────────────────── */}
       {(status === 'denied' || status === 'error') && errorMsg && (
         <div className="location-error-toast">
           <span>⚠️ {errorMsg}</span>
         </div>
       )}
 
-      <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          center={defaultCenter}
-          zoom={defaultZoom}
-          onLoad={onMapLoad}
-          options={{
-            mapTypeControl:    true,
-            streetViewControl: false,
-            fullscreenControl: true,
-            zoomControl:       true,
-          }}
-        >
-          {/* ══ POLÍGONOS DE ZONAS ══ */}
-          {zones.map((zone) => (
-            <Polygon
-              key={zone.id}
-              paths={zone.coordenadas}
-              options={{
-                strokeColor:   zone.color,
-                strokeOpacity: 0.9,
-                strokeWeight:  3,
-                fillColor:     zone.color,
-                fillOpacity:   hoveredZone?.id === zone.id ? 0.28 : 0.12,
-              }}
-              onMouseOver={() => setHoveredZone(zone)}
-              onMouseOut={()  => setHoveredZone(null)}
-              onClick={()     => handleZoneClick(zone)}
-            />
-          ))}
+      {/* ── GoogleMap SIN LoadScript ──────────────────────── */}
+      <GoogleMap
+        mapContainerStyle={mapContainerStyle}
+        center={defaultCenter}
+        zoom={defaultZoom}
+        onLoad={onMapLoad}
+        options={{
+          mapTypeControl:    true,
+          streetViewControl: false,
+          fullscreenControl: true,
+          zoomControl:       true,
+        }}
+      >
+        {/* ══ POLÍGONOS DE ZONAS ══ */}
+        {zones.map((zone) => (
+          <Polygon
+            key={zone.id}
+            paths={zone.coordenadas}
+            options={{
+              strokeColor:   zone.color,
+              strokeOpacity: 0.9,
+              strokeWeight:  3,
+              fillColor:     zone.color,
+              fillOpacity:   hoveredZone?.id === zone.id ? 0.28 : 0.12,
+            }}
+            onMouseOver={() => setHoveredZone(zone)}
+            onMouseOut={()  => setHoveredZone(null)}
+            onClick={()     => handleZoneClick(zone)}
+          />
+        ))}
 
-          {/* ══ PUESTOS DE GUARDIA ══ */}
-          {guardPosts.map((post) => (
-            <Marker
-              key={`guard-${post.id}`}
-              position={{ lat: post.lat, lng: post.lng }}
-              title={post.nombre}
-              icon={guardIconUrl}
-              zIndex={10}
-              onClick={() => handleGuardPostClick(post)}
-            />
-          ))}
+        {/* ══ PUESTOS DE GUARDIA ══ */}
+        {guardPosts.map((post) => (
+          <Marker
+            key={`guard-${post.id}`}
+            position={{ lat: post.lat, lng: post.lng }}
+            title={post.nombre}
+            icon={guardIconUrl}
+            zIndex={10}
+            onClick={() => handleGuardPostClick(post)}
+          />
+        ))}
 
-          {/* InfoWindow puesto de guardia */}
-          {selectedGuardPost && (
-            <InfoWindow
-              position={{ lat: selectedGuardPost.lat, lng: selectedGuardPost.lng }}
-              onCloseClick={() => setSelectedGuardPost(null)}
-            >
-              <div className="p-3 max-w-xs">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xl">🛡️</span>
-                  <h3 className="font-bold text-sm text-gray-900">{selectedGuardPost.nombre}</h3>
-                </div>
-                {selectedGuardPost.descripcion && (
-                  <p className="text-xs text-gray-500">{selectedGuardPost.descripcion}</p>
-                )}
-                <p className="text-xs text-blue-600 mt-1 font-semibold">Puesto de Seguridad Activo</p>
+        {/* InfoWindow puesto de guardia */}
+        {selectedGuardPost && (
+          <InfoWindow
+            position={{ lat: selectedGuardPost.lat, lng: selectedGuardPost.lng }}
+            onCloseClick={() => setSelectedGuardPost(null)}
+          >
+            <div className="p-3 max-w-xs">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xl">🛡️</span>
+                <h3 className="font-bold text-sm text-gray-900">{selectedGuardPost.nombre}</h3>
               </div>
-            </InfoWindow>
-          )}
+              {selectedGuardPost.descripcion && (
+                <p className="text-xs text-gray-500">{selectedGuardPost.descripcion}</p>
+              )}
+              <p className="text-xs text-blue-600 mt-1 font-semibold">Puesto de Seguridad Activo</p>
+            </div>
+          </InfoWindow>
+        )}
 
-          {/* ══ MARCADORES DE INCIDENTES ══ */}
-          {incidentsOnMap.map((incident) => (
-            <Marker
-              key={incident.id}
-              position={{ lat: Number(incident.latitud), lng: Number(incident.longitud) }}
-              title={incident.tipo_incidente}
-              icon={{
-                path:         'M 0,-1 A 1,1 0 0,1 0,1 A 1,1 0 0,1 0,-1',
-                fillColor:    getIncidentColor(incident.tipo_incidente),
-                fillOpacity:  1,
-                strokeColor:  '#fff',
-                strokeWeight: 2.5,
-                scale:        11,
-              }}
-              onClick={() => handleMarkerClick(incident)}
-            />
-          ))}
+        {/* ══ MARCADORES DE INCIDENTES ══ */}
+        {incidentsOnMap.map((incident) => (
+          <Marker
+            key={incident.id}
+            position={{ lat: Number(incident.latitud), lng: Number(incident.longitud) }}
+            title={incident.tipo_incidente}
+            icon={{
+              path:         'M 0,-1 A 1,1 0 0,1 0,1 A 1,1 0 0,1 0,-1',
+              fillColor:    getIncidentColor(incident.tipo_incidente),
+              fillOpacity:  1,
+              strokeColor:  '#fff',
+              strokeWeight: 2.5,
+              scale:        11,
+            }}
+            onClick={() => handleMarkerClick(incident)}
+          />
+        ))}
 
-          {/* InfoWindow incidente */}
-          {selectedMarker && Number(selectedMarker.latitud) && Number(selectedMarker.longitud) && (
-            <InfoWindow
-              position={{ lat: Number(selectedMarker.latitud), lng: Number(selectedMarker.longitud) }}
-              onCloseClick={() => setSelectedMarker(null)}
-            >
-              <div className="p-4 max-w-sm bg-white rounded-lg">
-                <h3 className="font-bold text-base mb-2 uppercase text-gray-900">
-                  {selectedMarker.tipo_incidente}
-                </h3>
+        {/* InfoWindow incidente */}
+        {selectedMarker && Number(selectedMarker.latitud) && Number(selectedMarker.longitud) && (
+          <InfoWindow
+            position={{ lat: Number(selectedMarker.latitud), lng: Number(selectedMarker.longitud) }}
+            onCloseClick={() => setSelectedMarker(null)}
+          >
+            <div className="p-4 max-w-sm bg-white rounded-lg">
+              <h3 className="font-bold text-base mb-2 uppercase text-gray-900">
+                {selectedMarker.tipo_incidente}
+              </h3>
 
-                {selectedMarker.zona_id != null && (
-                  <p className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
-                    📍 {zones.find((z) => z.id === selectedMarker.zona_id)?.nombre || 'Zona desconocida'}
-                  </p>
-                )}
-
-                <div className="mb-2">
-                  <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${
-                    selectedMarker.estado === 'Pendiente' ? 'bg-red-200 text-red-900'
-                    : selectedMarker.estado === 'Atendido' ? 'bg-yellow-200 text-yellow-900'
-                    : 'bg-green-200 text-green-900'
-                  }`}>
-                    {selectedMarker.estado === 'Pendiente' && '🔴 '}
-                    {selectedMarker.estado === 'Atendido'  && '🟠 '}
-                    {selectedMarker.estado === 'Cerrado'   && '🟢 '}
-                    {selectedMarker.estado}
-                  </span>
-                </div>
-
-                <p className="text-sm text-gray-700 mb-2 border-t pt-2">{selectedMarker.descripcion}</p>
-                <p className="text-xs text-gray-600 mb-1">
-                  👤 <strong>Reportado por:</strong> {selectedMarker.usuario?.nombre || 'Usuario'}
+              {selectedMarker.zona_id != null && (
+                <p className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
+                  📍 {zones.find((z) => z.id === selectedMarker.zona_id)?.nombre || 'Zona desconocida'}
                 </p>
-                <p className="text-xs text-gray-500">
-                  🕐 {selectedMarker.created_at
-                    ? new Date(selectedMarker.created_at).toLocaleString('es-ES')
-                    : 'Fecha no disponible'}
-                </p>
-              </div>
-            </InfoWindow>
-          )}
-
-          {/* ══ A-18.3: MARCADOR + CÍRCULO DE PRECISIÓN (ubicación del usuario) ══ */}
-          {status === 'success' && location && (
-            <>
-              {/* Círculo de precisión GPS */}
-              {location.accuracy && location.accuracy < 200 && (
-                <Circle
-                  center={{ lat: location.lat, lng: location.lng }}
-                  radius={location.accuracy}
-                  options={{
-                    strokeColor:   '#4285F4',
-                    strokeOpacity: 0.4,
-                    strokeWeight:  1,
-                    fillColor:     '#4285F4',
-                    fillOpacity:   0.08,
-                    zIndex:        5,
-                  }}
-                />
               )}
 
-              {/* Punto azul de posición actual */}
-              <Marker
-                position={{ lat: location.lat, lng: location.lng }}
-                title="Tu ubicación actual"
-                icon={userIconUrl}
-                zIndex={20}
+              <div className="mb-2">
+                <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${
+                  selectedMarker.estado === 'Pendiente' ? 'bg-red-200 text-red-900'
+                  : selectedMarker.estado === 'Atendido' ? 'bg-yellow-200 text-yellow-900'
+                  : 'bg-green-200 text-green-900'
+                }`}>
+                  {selectedMarker.estado === 'Pendiente' && '🔴 '}
+                  {selectedMarker.estado === 'Atendido'  && '🟠 '}
+                  {selectedMarker.estado === 'Cerrado'   && '🟢 '}
+                  {selectedMarker.estado}
+                </span>
+              </div>
+
+              <p className="text-sm text-gray-700 mb-2 border-t pt-2">{selectedMarker.descripcion}</p>
+              <p className="text-xs text-gray-600 mb-1">
+                👤 <strong>Reportado por:</strong> {selectedMarker.usuario?.nombre || 'Usuario'}
+              </p>
+              <p className="text-xs text-gray-500">
+                🕐 {selectedMarker.created_at
+                  ? new Date(selectedMarker.created_at).toLocaleString('es-ES')
+                  : 'Fecha no disponible'}
+              </p>
+            </div>
+          </InfoWindow>
+        )}
+
+        {/* ══ MARCADOR + CÍRCULO DE PRECISIÓN (ubicación del usuario) ══ */}
+        {status === 'success' && location && (
+          <>
+            {location.accuracy && location.accuracy < 200 && (
+              <Circle
+                center={{ lat: location.lat, lng: location.lng }}
+                radius={location.accuracy}
+                options={{
+                  strokeColor:   '#4285F4',
+                  strokeOpacity: 0.4,
+                  strokeWeight:  1,
+                  fillColor:     '#4285F4',
+                  fillOpacity:   0.08,
+                  zIndex:        5,
+                }}
               />
-            </>
-          )}
-        </GoogleMap>
-      </LoadScript>
+            )}
+            <Marker
+              position={{ lat: location.lat, lng: location.lng }}
+              title="Tu ubicación actual"
+              icon={userIconUrl}
+              zIndex={20}
+            />
+          </>
+        )}
+      </GoogleMap>
     </div>
   )
 }

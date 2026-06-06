@@ -80,7 +80,7 @@ export const useUserLocation = () => {
         setStatus('success')
       },
       () => { /* ignorar errores de watch silenciosamente */ },
-      { enableHighAccuracy: true, maximumAge: 5000 }
+      { enableHighAccuracy: true, maximumAge: 1000 }
     )
   }, [])
 
