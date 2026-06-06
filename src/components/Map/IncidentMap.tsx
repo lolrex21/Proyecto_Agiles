@@ -8,7 +8,8 @@ import {
 import { useState, useEffect } from 'react'
 import type { Incident } from '../../types/incident'
 import { usePolygons } from '../../hooks/usePolygons'
-import { getZoneByPoint } from '../../services/polygonService'
+import { getZoneByPoint, type ZonePolygon } from '../../services/polygonService'
+import './IncidentMap.css'
 
 interface IncidentMapProps {
   incidents: Incident[]
@@ -37,22 +38,18 @@ export default function IncidentMap({
   const [selectedMarker, setSelectedMarker] = useState<Incident | null>(null)
   const { zones } = usePolygons()
   const [incidentsWithZone, setIncidentsWithZone] = useState<Incident[]>([])
+  const [hoveredZone, setHoveredZone] = useState<ZonePolygon | null>(null)
 
   // 🎯 ASIGNAR ZONA A CADA INCIDENTE AUTOMÁTICAMENTE
   useEffect(() => {
     const assignZones = async () => {
       const updated = await Promise.all(
         incidents.map(async (incident) => {
-          if (
-            incident.latitud &&
-            incident.longitud &&
-            !incident.zona_id
-          ) {
+          if (incident.latitud && incident.longitud && !incident.zona_id) {
             const zone = await getZoneByPoint(
               Number(incident.latitud),
               Number(incident.longitud)
             )
-
             return {
               ...incident,
               zona_id: zone?.id,
@@ -113,6 +110,21 @@ export default function IncidentMap({
         </div>
       )}
 
+      {hoveredZone && (
+        <div className="zone-hover-chip">
+          <span
+            className="zone-hover-swatch"
+            style={{ backgroundColor: hoveredZone.color }}
+          />
+          <span className="zone-hover-text">
+            <strong>{hoveredZone.nombre}</strong>
+            {hoveredZone.descripcion && (
+              <small>{hoveredZone.descripcion}</small>
+            )}
+          </span>
+        </div>
+      )}
+
       <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
         <GoogleMap
           mapContainerStyle={mapContainerStyle}
@@ -125,7 +137,7 @@ export default function IncidentMap({
             zoomControl: true,
           }}
         >
-          {/* ========== DIBUJAR POLÍGONOS DE LAS 4 ZONAS ========== */}
+          {/* ========== POLÍGONOS DE ZONAS ========== */}
           {zones.map((zone) => (
             <Polygon
               key={zone.id}
@@ -135,12 +147,18 @@ export default function IncidentMap({
                 strokeOpacity: 0.9,
                 strokeWeight: 3,
                 fillColor: zone.color,
-                fillOpacity: 0.12,
+                fillOpacity: hoveredZone?.id === zone.id ? 0.25 : 0.12,
+              }}
+              onMouseOver={() => {
+                setHoveredZone(zone)
+              }}
+              onMouseOut={() => {
+                setHoveredZone(null)
               }}
             />
           ))}
 
-          {/* ========== DIBUJAR MARCADORES DE INCIDENTES ========== */}
+          {/* ========== MARCADORES DE INCIDENTES ========== */}
           {incidentsWithLocation.map((incident) => (
             <Marker
               key={incident.id}
@@ -161,7 +179,7 @@ export default function IncidentMap({
             />
           ))}
 
-          {/* ========== INFO WINDOW CON INFORMACIÓN CLARA ========== */}
+          {/* ========== INFO WINDOW AL HACER CLIC EN MARCADOR ========== */}
           {selectedMarker &&
             Number(selectedMarker.latitud) &&
             Number(selectedMarker.longitud) && (
@@ -173,21 +191,17 @@ export default function IncidentMap({
                 onCloseClick={() => setSelectedMarker(null)}
               >
                 <div className="p-4 max-w-sm bg-white rounded-lg">
-                  {/* Tipo de incidente - Título grande */}
                   <h3 className="font-bold text-base mb-2 uppercase text-gray-900">
                     {selectedMarker.tipo_incidente}
                   </h3>
 
-                  {/* Zona - Información importante */}
                   {selectedMarker.zona_id != null && (
                     <p className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
                       📍{' '}
-                      {zones.find((z) => z.id === selectedMarker.zona_id)
-                        ?.nombre || 'Zona desconocida'}
+                      {zones.find((z) => z.id === selectedMarker.zona_id)?.nombre || 'Zona desconocida'}
                     </p>
                   )}
 
-                  {/* Estado - Badge coloreado */}
                   <div className="mb-2">
                     <span
                       className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${
@@ -205,24 +219,19 @@ export default function IncidentMap({
                     </span>
                   </div>
 
-                  {/* Descripción */}
                   <p className="text-sm text-gray-700 mb-2 border-t pt-2">
                     {selectedMarker.descripcion}
                   </p>
 
-                  {/* Reportado por */}
                   <p className="text-xs text-gray-600 mb-1">
                     👤 <strong>Reportado por:</strong>{' '}
                     {selectedMarker.usuario?.nombre || 'Usuario'}
                   </p>
 
-                  {/* Fecha y hora */}
                   <p className="text-xs text-gray-500">
                     🕐{' '}
                     {selectedMarker.created_at
-                      ? new Date(selectedMarker.created_at).toLocaleString(
-                          'es-ES'
-                        )
+                      ? new Date(selectedMarker.created_at).toLocaleString('es-ES')
                       : 'Fecha no disponible'}
                   </p>
                 </div>

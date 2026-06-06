@@ -90,6 +90,57 @@
   color: #666;
 }
 
+.zone-hover-chip {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  max-width: min(360px, calc(100% - 2rem));
+  padding: 0.6rem 0.85rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16);
+  color: #1f2937;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.zone-hover-swatch {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18);
+  flex: 0 0 auto;
+}
+
+.zone-hover-text {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.zone-hover-text strong {
+  overflow: hidden;
+  font-size: 0.78rem;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zone-hover-text small {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Info Window Personalizada */
 .info-window {
   padding: 0.75rem;
@@ -155,6 +206,11 @@
 }
 
 @media (max-width: 480px) {
+  .zone-hover-chip {
+    top: 4.25rem;
+    padding: 0.55rem 0.7rem;
+  }
+
   .no-incidents {
     padding: 1rem 1.5rem;
   }

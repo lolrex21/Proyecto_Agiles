@@ -7,6 +7,7 @@ import {
   type FormEvent,
 } from 'react'
 import Toast from '../Toast'
+import { getZoneByPoint } from '../../services/polygonService'
 import { supabase } from '../../services/supabaseClient'
 import { getCurrentUser } from '../../services/authService'
 import { emergencySocket } from '../../services/emergencySocket'
@@ -143,13 +144,14 @@ export default function IncidentReportForm() {
     try {
       const user = getCurrentUser()
       const location = await getCurrentLocation()
+      const zone = await getZoneByPoint(location.latitud, location.longitud)
 
       const { data: newIncident, error } = await supabase
         .from('incidentes')
         .insert([
           {
             usuario_id: user?.id || null,
-            zona_id: null,
+            zona_id: zone?.id || null,    
             tipo_incidente: 'otro',
             descripcion: 'Emergencia reportada (sin detalles aún)',
             estado: 'Pendiente',
