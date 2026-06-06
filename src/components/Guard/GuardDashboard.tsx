@@ -583,7 +583,7 @@ export default function GuardDashboard() {
                     <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Ubicación</span>
                   </div>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
-                    {selectedIncident.ubicacion || 'No especificada'}
+                    {selectedIncident.zona?.nombre || 'No especificada'}
                   </div>
                 </div>
 
