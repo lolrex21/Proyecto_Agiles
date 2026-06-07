@@ -3,8 +3,10 @@ import Header from '../Header'
 import SearchBar from '../SearchBar'
 import IncidentMap from '../Map/IncidentMap'
 import IncidentList from '../IncidentList'
+import Toast from '../Toast'
 import { useIncidents } from '../../hooks/useIncidents'
 import { useEmergencySocket } from '../../hooks/useEmergencySocket'
+import { useAudioAlert } from '../../hooks/useAudioAlert'
 import { emergencySocket } from '../../services/emergencySocket'
 import { supabase } from '../../services/supabaseClient'
 import { getCurrentUser } from '../../services/authService'
@@ -30,6 +32,10 @@ export default function GuardDashboard() {
   const [activeAlerts, setActiveAlerts] = useState<any[]>([])
   const [currentIncidentId, setCurrentIncidentId] = useState<string | null>(null)
   const [confirmCloseId, setConfirmCloseId] = useState<number | null>(null)
+  const [alertToast, setAlertToast] = useState<{ message: string } | null>(null)
+  const [alertedIncidentIds, setAlertedIncidentIds] = useState<Set<string>>(new Set())
+
+  const { soundEnabled, toggleSound, playAlert } = useAudioAlert()
 
   const visibleIncidents = useMemo(() => {
     const map = new Map<string, any>()
@@ -318,24 +324,28 @@ export default function GuardDashboard() {
       })
 
       const incidentId = String(cleanIncident.id)
-      const yaConocido =
-        activeAlerts.some((i) => String(i.id) === incidentId) ||
-        incidents.some((i: any) => String(i.id) === incidentId)
 
       upsertLocalIncident(cleanIncident)
 
-      if (
-        cleanIncident.estado === 'Pendiente' &&
-        !yaConocido &&
-        'Notification' in window &&
-        Notification.permission === 'granted'
-      ) {
-        new Notification('Nueva emergencia', {
-          body: cleanIncident.descripcion || 'Se ha reportado una nueva emergencia',
+      if (cleanIncident.estado === 'Pendiente' && !alertedIncidentIds.has(incidentId)) {
+        setAlertedIncidentIds((prev) => new Set(prev).add(incidentId))
+        playAlert()
+
+        const tipo = cleanIncident.tipo_incidente || 'Emergencia'
+        const ubicacion = cleanIncident.ubicacion || 'Ubicación no especificada'
+        setAlertToast({
+          message: `ALERTA DE INCIDENTE — ${tipo} — ${ubicacion}`,
         })
+        setTimeout(() => setAlertToast(null), 5000)
+
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('Nueva emergencia', {
+            body: cleanIncident.descripcion || 'Se ha reportado una nueva emergencia',
+          })
+        }
       }
     },
-    [activeAlerts, incidents, sanitizeIncident, upsertLocalIncident]
+    [alertedIncidentIds, sanitizeIncident, upsertLocalIncident, playAlert]
   )
 
 const handleSocketIncidentTaken = useCallback(
@@ -401,6 +411,13 @@ const { zones } = usePolygons()
   return (
     <div className="guard-dashboard">
       <Header />
+      {alertToast && (
+        <Toast
+          message={alertToast.message}
+          type="info"
+          onClose={() => setAlertToast(null)}
+        />
+      )}
 
       <main className="dashboard-main">
         <section className="dashboard-toolbar">
@@ -431,6 +448,23 @@ const { zones } = usePolygons()
               title="Ver solo lista"
             >
               Lista
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 ml-4">
+            <span className="text-xs font-semibold text-gray-600">Alertas de sonido</span>
+            <button
+              onClick={toggleSound}
+              className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                soundEnabled ? 'bg-uta-navy' : 'bg-gray-300'
+              }`}
+              aria-label="Toggle sound alerts"
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                  soundEnabled ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
             </button>
           </div>
         </section>
