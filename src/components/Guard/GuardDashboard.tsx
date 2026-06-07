@@ -4,9 +4,12 @@ import SearchBar from '../SearchBar'
 import IncidentMap from '../Map/IncidentMap'
 import IncidentList from '../IncidentList'
 import Toast from '../Toast'
+import AssignedGuardsList from './AssignedGuardsList'
+import ConfirmAttendanceButton from './ConfirmAttendanceButton'
 import { useIncidents } from '../../hooks/useIncidents'
 import { useEmergencySocket } from '../../hooks/useEmergencySocket'
 import { useAudioAlert } from '../../hooks/useAudioAlert'
+import { useIncidentGuards } from '../../hooks/useIncidentGuards'
 import { emergencySocket } from '../../services/emergencySocket'
 import { supabase } from '../../services/supabaseClient'
 import { getCurrentUser } from '../../services/authService'
@@ -36,6 +39,10 @@ export default function GuardDashboard() {
   const [alertedIncidentIds, setAlertedIncidentIds] = useState<Set<string>>(new Set())
 
   const { soundEnabled, toggleSound, playAlert } = useAudioAlert()
+
+  const guardIdNum = user?.id ? Number(user.id) : 0
+  const selectedIncidentId = selectedIncident ? Number(selectedIncident.id) : null
+  const { guards: assignedGuards, loading: guardsLoading } = useIncidentGuards(selectedIncidentId)
 
   const visibleIncidents = useMemo(() => {
     const map = new Map<string, any>()
@@ -211,6 +218,15 @@ export default function GuardDashboard() {
         setCurrentIncidentId(incidentIdText)
         upsertLocalIncident(updatedIncident)
         setSelectedIncident(updatedIncident)
+
+        // Register Primary Guard in junction table for multi-guard tracking
+        await supabase
+          .from('incidente_guardias')
+          .insert({
+            incidente_id: incidentId,
+            guardia_id: Number(guardId),
+            estado_asistencia: 'confirmado',
+          })
 
         emergencySocket.takeIncident(incidentIdText, guardId, updatedIncident)
         emergencySocket.updateIncident(incidentIdText, 'Atendido', guardId)
@@ -565,11 +581,39 @@ const { zones } = usePolygons()
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                       <circle cx="12" cy="7" r="4" />
                     </svg>
-                    <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Guardia Asignado</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Guardia Principal</span>
                   </div>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
                     {selectedIncident.guardia_id ? `Guardia #${selectedIncident.guardia_id}` : 'Sin asignar'}
                   </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-uta-red" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Guardias de Apoyo</span>
+                  </div>
+                  <AssignedGuardsList
+                    guards={assignedGuards}
+                    loading={guardsLoading}
+                    primaryGuardId={String(selectedIncident.guardia_id)}
+                  />
+                  {selectedIncident.estado !== 'Cerrado' &&
+                    String(selectedIncident.guardia_id) !== guardId && (
+                      <div className="mt-3">
+                        <ConfirmAttendanceButton
+                          incidentId={Number(selectedIncident.id)}
+                          guardId={guardIdNum}
+                          isAlreadyAssigned={assignedGuards.some((g) => g.guardia_id === guardIdNum)}
+                          onConfirm={() => {}}
+                        />
+                      </div>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2 pt-2">
@@ -639,7 +683,7 @@ const { zones } = usePolygons()
                 {selectedIncident.estado === 'Atendido' &&
                   String(selectedIncident.guardia_id) !== guardId && (
                     <span className="text-xs text-gray-500 italic">
-                      Este caso ya fue tomado por otro guardia.
+                      Solo el Guardia Principal puede cerrar este caso.
                     </span>
                   )}
 
