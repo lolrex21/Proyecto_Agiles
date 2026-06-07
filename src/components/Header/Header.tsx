@@ -14,7 +14,8 @@ export default function Header() {
   const userEmail = user?.email || user?.correo || 'Correo no disponible'
   const userRole = user?.rol || user?.role || user?.tipo_usuario || 'estudiante'
 
-  const isGuard = userRole === 'guardia' || userRole === 'guard'
+  const isGuard = /guardia|guard/i.test(userRole)
+  const isAdmin = /admin|administrador/i.test(userRole)
 
   return (
     <header className="app-header">
@@ -42,7 +43,11 @@ export default function Header() {
 
             <div className="user-details">
               <span className="user-role">
-                {isGuard ? 'Guardia de seguridad' : 'Estudiante'}
+                {isGuard
+                  ? 'Guardia de seguridad'
+                  : isAdmin
+                  ? 'Administrador'
+                  : 'Usuario'}
               </span>
 
               <strong className="user-fullname">

@@ -1,11 +1,16 @@
 .app-header {
   width: 100%;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #0f2a4a 0%, #1f4f88 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+}
+
+.brand-title,
+.brand-subtitle {
+  color: #ffffff;
 }
 
 .app-header-container {
@@ -44,14 +49,14 @@
   font-size: 1.25rem;
   line-height: 1.1;
   font-weight: 800;
-  color: #0f172a;
+  color: #ffffff;
   letter-spacing: -0.03em;
 }
 
 .brand-subtitle {
   margin: 0.2rem 0 0;
   font-size: 0.82rem;
-  color: #64748b;
+  color: #e2e8f0;
 }
 
 .user-card {

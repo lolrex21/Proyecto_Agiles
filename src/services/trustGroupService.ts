@@ -371,7 +371,7 @@ export const notifyGroupMembers = async (
 
     if (error || !members || members.length === 0) return false
 
-    const notifications = members.map(member => ({
+    const notifications = members.map(() => ({
       grupo_id: groupId,
       incidente_id: incidentId,
       usuario_emisor_id: userIdEmitter,

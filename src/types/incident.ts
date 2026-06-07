@@ -8,7 +8,9 @@ export interface Incident {
   estado: 'Pendiente' | 'Atendido' | 'Cerrado'
   latitud?: number
   longitud?: number
-  created_at?: string
+  fecha?: string
+
+  imagen?: string | null
   usuario?: { nombre: string }
   guardia_id?: string
   zona_id?: number
@@ -16,9 +18,9 @@ export interface Incident {
 }
 
 export interface MapMarker {
-  id: string;
-  lat: number;
-  lng: number;
-  title: string;
-  severity: 'high' | 'medium' | 'low';
+  id: string
+  lat: number
+  lng: number
+  title: string
+  severity: 'high' | 'medium' | 'low'
 }

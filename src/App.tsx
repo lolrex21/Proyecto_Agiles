@@ -121,9 +121,16 @@ function App() {
     return <LoginForm onLogin={handleLogin} initialMessage={sessionMessage} />
   }
 
-  if (currentUser?.rol === 'guardia') {
-    return <GuardDashboard />
-  }
+  const currentRole = currentUser?.rol || ''
+
+if (
+  currentRole.toLowerCase() === 'guardia' ||
+  currentRole.toLowerCase() === 'guard' ||
+  currentRole.toLowerCase() === 'admin' ||
+  currentRole.toLowerCase() === 'administrador'
+) {
+  return <GuardDashboard role={currentRole} />
+}
 
   return (
     <div className="min-h-screen bg-gray-100">

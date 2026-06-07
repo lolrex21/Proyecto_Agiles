@@ -1,160 +1,705 @@
-/* src/components/Guard/GuardDashboard.css */
+  /* src/components/Guard/GuardDashboard.css */
 
-.guard-dashboard {
-  height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  background: #f3f4f6;
-  overflow: hidden;
-}
+  .guard-dashboard {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: #f3f4f6;
+    overflow: hidden;
+  }
 
-.dashboard-main {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  max-width: 1520px;
-  margin: 0 auto;
-  padding: 0.75rem 1rem 1rem;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 0.75rem;
-  overflow: hidden;
-}
+  .dashboard-main {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    max-width: 1520px;
+    margin: 0 auto;
+    padding: 0.75rem 1rem 1rem;
+    overflow: hidden;
+  }
 
-/* Barra superior compacta */
+  .dashboard-layout {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 1rem;
+    min-height: calc(100dvh - 4.5rem);
+  }
+
+  .dashboard-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 24px;
+    padding: 1.25rem;
+    box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+  }
+
+  .sidebar-top {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .sidebar-label {
+    margin: 0;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #0f2a4a;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+
+  .sidebar-title {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: #0f172a;
+  }
+
+  .sidebar-subtitle {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #64748b;
+  }
+
+  .sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 1rem;
+  }
+
+  .sidebar-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    background: #0f2a4a;
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    font-weight: 900;
+    font-size: 1.1rem;
+  }
+
+  .sidebar-user-name {
+    margin: 0;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .sidebar-user-email {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    color: #64748b;
+  }
+
+  .sidebar-menu {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .sidebar-item {
+    text-align: left;
+    padding: 0.95rem 1rem;
+    border-radius: 16px;
+    border: 1px solid transparent;
+    background: #eef2ff;
+    color: #0f2a4a;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .sidebar-item:hover,
+  .sidebar-item.active {
+    background: #0f2a4a;
+    color: #ffffff;
+    border-color: rgba(15, 42, 74, 0.15);
+  }
+
+  .dashboard-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .dashboard-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .summary-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 110px;
+    padding: 1.3rem;
+    border-radius: 24px;
+    border: 1px solid #e5e7eb;
+  }
+
+  .summary-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #475569;
+    text-transform: uppercase;
+  }
+
+  .summary-number {
+    margin-top: 0.85rem;
+    font-size: 2.25rem;
+    font-weight: 900;
+    color: #0f172a;
+  }
+
 .dashboard-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: end;
   gap: 0.75rem;
   background: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 0.65rem;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  border-radius: 18px;
+  padding: 0.65rem 0.75rem;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
 }
 
-/* Aquí evitamos que el buscador parezca una tarjeta gigante */
-.dashboard-search {
-  min-width: 0;
-}
+  .dashboard-search {
+    min-width: 0;
+  }
 
-/* Si el SearchBar trae títulos internos, los compactamos */
-.dashboard-search h1,
-.dashboard-search h2,
-.dashboard-search h3 {
-  display: none;
-}
+  .dashboard-content {
+    min-height: 0;
+    display: grid;
+    gap: 0.9rem;
+    overflow: hidden;
+  }
 
-/* Si el SearchBar tiene una tarjeta interna, le quitamos exceso */
-.dashboard-search > div {
-  margin: 0 !important;
-  padding: 0 !important;
-  box-shadow: none !important;
-  border: none !important;
-  background: transparent !important;
-}
+  .dashboard-content.split {
+    grid-template-columns: minmax(0, 1.55fr) minmax(420px, 0.85fr);
+  }
 
-/* Botones de vista más discretos */
-.view-toggle {
-  display: inline-flex;
-  gap: 0.25rem;
-  background: #f1f5f9;
-  padding: 0.25rem;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-}
+  .dashboard-content.map,
+  .dashboard-content.list {
+    grid-template-columns: 1fr;
+  }
 
-.toggle-btn {
-  padding: 0.45rem 0.75rem;
-  border: 0;
-  background: transparent;
-  color: #475569;
-  border-radius: 9px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.2s ease;
-}
+  .dashboard-card {
+    min-height: 0;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
 
-.toggle-btn:hover {
-  background: #e2e8f0;
-  color: #0f172a;
-}
+  .section-header {
+    flex-shrink: 0;
+    border-bottom: 1px solid #e5e7eb;
+    background: #ffffff;
+  }
 
-.toggle-btn.active {
-  background: #0f2a4a;
-  color: #ffffff;
-  box-shadow: 0 4px 10px rgba(15, 42, 74, 0.22);
-}
+  .compact-header {
+    padding: 0.75rem 0.9rem;
+  }
 
-/* Layout principal más grande */
-.dashboard-content {
-  min-height: 0;
-  display: grid;
-  gap: 0.9rem;
-  overflow: hidden;
-}
+  .section-header h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 900;
+    color: #0f172a;
+  }
+
+  .section-header p {
+    margin: 0.2rem 0 0;
+    font-size: 0.76rem;
+    color: #64748b;
+  }
+
+  /* Aquí evitamos que el buscador parezca una tarjeta gigante */
+  .dashboard-search {
+    min-width: 0;
+  }
+
+  /* El SearchBar maneja su propio título de filtros */
+  .dashboard-search h1,
+  .dashboard-search h2,
+  .dashboard-search h3 {
+    display: block;
+  }
+
+  /* Si el SearchBar tiene una tarjeta interna, le quitamos exceso */
+  .dashboard-search > div {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  /* Botones de vista más discretos */
+  .view-toggle {
+    display: inline-flex;
+    gap: 0.25rem;
+    background: #f1f5f9;
+    padding: 0.25rem;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+  }
+
+  .toggle-btn {
+    padding: 0.45rem 0.75rem;
+    border: 0;
+    background: transparent;
+    color: #475569;
+    border-radius: 9px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+
+  .toggle-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+
+  .toggle-btn.active {
+    background: #0f2a4a;
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(15, 42, 74, 0.22);
+  }
+
+  /* Layout principal más grande */
+  .dashboard-content {
+    min-height: 0;
+    display: grid;
+    gap: 0.9rem;
+    overflow: hidden;
+  }
 
 .dashboard-content.split {
   grid-template-columns: minmax(0, 1.55fr) minmax(420px, 0.85fr);
-}
-
-.dashboard-content.map,
-.dashboard-content.list {
-  grid-template-columns: 1fr;
-}
-
-.dashboard-card {
+  grid-template-rows: minmax(420px, 1fr) auto;
+  grid-template-areas:
+    'map list'
+    'cards list';
   min-height: 0;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
 }
 
-.section-header {
-  flex-shrink: 0;
-  border-bottom: 1px solid #e5e7eb;
-  background: #ffffff;
-}
+  .dashboard-content.map,
+  .dashboard-content.list {
+    grid-template-columns: 1fr;
+  }
 
-.compact-header {
-  padding: 0.75rem 0.9rem;
-}
+  .map-section {
+    grid-area: map;
+    overflow: hidden;
+    min-height: 520px;
+    max-height: 700px;
+  }
 
-.section-header h2 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 900;
-  color: #0f172a;
-}
+  .bottom-cards {
+    grid-area: cards;
+  }
 
-.section-header p {
-  margin: 0.2rem 0 0;
-  font-size: 0.76rem;
-  color: #64748b;
-}
+  .list-section {
+    grid-area: list;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
-/* Mapa más grande */
+  .dashboard-card {
+    min-height: 0;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .section-header {
+    flex-shrink: 0;
+    border-bottom: 1px solid #e5e7eb;
+    background: #ffffff;
+  }
+
+  .compact-header {
+    padding: 0.75rem 0.9rem;
+  }
+
+  .section-header h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 900;
+    color: #0f172a;
+  }
+
+  .section-header p {
+    margin: 0.2rem 0 0;
+    font-size: 0.76rem;
+    color: #64748b;
+  }
+
+  /* Mapa más grande */
 .map-section {
+  grid-area: map;
   overflow: hidden;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
 }
 
 .map-wrapper {
   flex: 1;
   min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+  /* Lista más grande, un solo scroll */
+  .list-section {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .incident-list-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.6rem;
+  }
+
+  /* Quita scroll interno duplicado del IncidentList */
+  .incident-list-scroll > * {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Si dentro de IncidentList hay contenedores con overflow, los neutralizamos */
+  .incident-list-scroll div {
+    scrollbar-width: thin;
+  }
+
+  .incident-list-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .incident-list-scroll::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+
+  .incident-list-scroll::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+  }
+
+  .incident-list-scroll::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  /* Sección de estadísticas */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .stats-card {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 1rem;
+  }
+
+  .stats-title {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .stats-number {
+    margin-top: 0.75rem;
+    font-size: 2rem;
+    font-weight: 900;
+    color: #0f172a;
+  }
+
+  /* Panel flotante */
+  .incident-detail-panel {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    width: 340px;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 1.25rem;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+    max-height: 430px;
+    overflow-y: auto;
+    z-index: 200;
+    animation: slideIn 0.25s ease;
+  }
+
+  @keyframes slideIn {
+    from {
+      transform: translateX(420px);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  .close-btn {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: #f1f5f9;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    color: #64748b;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .close-btn:hover {
+    color: #111827;
+    background-color: #e2e8f0;
+  }
+
+  .incident-detail-panel h3 {
+    margin: 0 2rem 0.8rem 0;
+    font-size: 1.1rem;
+    color: #111827;
+    font-weight: 900;
+  }
+
+  .incident-detail-panel p {
+    margin: 0.75rem 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #475569;
+  }
+
+  .incident-description {
+    white-space: pre-line;
+  }
+
+  .status {
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  .status-pendiente {
+    background-color: #fee2e2;
+    color: #b91c1c;
+  }
+
+  .status-atendido,
+  .status-en-proceso {
+    background-color: #fef3c7;
+    color: #b45309;
+  }
+
+  .status-cerrado {
+    background-color: #dcfce7;
+    color: #166534;
+  }
+
+  .take-case-btn {
+    width: 100%;
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: 12px;
+    background: #0f2a4a;
+    color: #ffffff;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+
+  .take-case-btn:hover:not(:disabled) {
+    background: #143b69;
+    transform: translateY(-1px);
+  }
+
+  .take-case-btn:disabled {
+    background: #cbd5e1;
+    color: #64748b;
+    cursor: not-allowed;
+  }
+
+  .busy-message {
+    margin-top: 0.75rem;
+    color: #dc2626 !important;
+    font-size: 0.8rem !important;
+    font-weight: 700;
+  }
+
+  /* Tablet */
+  @media (max-width: 1024px) {
+    .dashboard-content.split {
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
+    }
+  }
+
+  /* Celular */
+  @media (max-width: 768px) {
+    .guard-dashboard {
+      height: auto;
+      min-height: 100dvh;
+      overflow: visible;
+    }
+
+    .dashboard-main {
+      display: flex;
+      flex-direction: column;
+      padding: 0.65rem;
+      gap: 0.7rem;
+      overflow: visible;
+    }
+
+    .dashboard-toolbar {
+      grid-template-columns: 1fr;
+      padding: 0.55rem;
+    }
+
+    .view-toggle {
+      display: none;
+    }
+
+    .dashboard-content,
+    .dashboard-content.split,
+    .dashboard-content.map,
+    .dashboard-content.list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      overflow: visible;
+    }
+
+    .map-section {
+      height: 42vh;
+      min-height: 300px;
+      flex: none;
+    }
+
+    .list-section {
+      min-height: auto;
+      flex: none;
+    }
+
+    .incident-list-scroll {
+      overflow: visible;
+      padding: 0.55rem;
+    }
+
+    .incident-list-scroll > * {
+      overflow: visible !important;
+      max-height: none !important;
+    }
+
+    .incident-detail-panel {
+      width: auto;
+      left: 0.75rem;
+      right: 0.75rem;
+      bottom: 0.75rem;
+      max-height: 55vh;
+      border-radius: 16px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .dashboard-main {
+      padding: 0.55rem;
+    }
+
+    .map-section {
+      height: 40vh;
+      min-height: 270px;
+    }
+
+    .compact-header {
+      padding: 0.65rem 0.75rem;
+    }
+
+    .section-header h2 {
+      font-size: 0.95rem;
+    }
+
+    .section-header p {
+      font-size: 0.72rem;
+    }
+
+    .incident-detail-panel {
+      left: 0.5rem;
+      right: 0.5rem;
+      bottom: 0.5rem;
+      padding: 1rem;
+    }
+  }
+
+  .list-section {
+  grid-area: list;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
-/* Lista más grande, un solo scroll */
+/* PANEL DERECHO MÁS LARGO */
+.dashboard-content.split {
+  grid-template-columns: minmax(0, 1.55fr) minmax(420px, 0.85fr);
+  grid-template-rows: 580px 130px;
+  grid-template-areas:
+    'map list'
+    'cards list';
+  min-height: 0;
+}
+
+/* El panel de incidentes ocupa todo el alto de mapa + tarjetas */
 .list-section {
+  grid-area: list;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
+/* Solo esta parte tendrá scroll */
 .incident-list-scroll {
   flex: 1;
   min-height: 0;
@@ -163,257 +708,1529 @@
   padding: 0.6rem;
 }
 
-/* Quita scroll interno duplicado del IncidentList */
-.incident-list-scroll > * {
-  height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
+/* Tarjetas inferiores */
+.bottom-cards {
+  grid-area: cards;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
 }
 
-/* Si dentro de IncidentList hay contenedores con overflow, los neutralizamos */
-.incident-list-scroll div {
-  scrollbar-width: thin;
+/* Ajuste visual del panel de filtros */
+.dashboard-search > div {
+  margin: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+  background: transparent !important;
 }
 
-.incident-list-scroll::-webkit-scrollbar {
-  width: 8px;
+.search-panel {
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
-.incident-list-scroll::-webkit-scrollbar-track {
-  background: #f1f5f9;
+.search-fields {
+  margin-top: 0 !important;
+  align-items: end;
 }
 
-.incident-list-scroll::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 999px;
+/* Alinea los botones Dividida / Mapa / Lista con los inputs */
+.view-toggle.compact {
+  align-self: end;
+  margin-bottom: 0.05rem;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
-.incident-list-scroll::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* Panel flotante */
-.incident-detail-panel {
-  position: fixed;
-  right: 1rem;
-  bottom: 1rem;
-  width: 340px;
-  background-color: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  padding: 1.25rem;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
-  max-height: 430px;
-  overflow-y: auto;
-  z-index: 200;
-  animation: slideIn 0.25s ease;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(420px);
-    opacity: 0;
-  }
-
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.close-btn {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  background: #f1f5f9;
-  border: none;
-  font-size: 1rem;
-  cursor: pointer;
-  color: #64748b;
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
+.view-toggle.compact .toggle-btn {
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
-.close-btn:hover {
-  color: #111827;
-  background-color: #e2e8f0;
+/* Vista solo mapa */
+.dashboard-content.map {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  height: calc(100dvh - 170px);
+  min-height: 0;
+  overflow: hidden;
 }
 
-.incident-detail-panel h3 {
-  margin: 0 2rem 0.8rem 0;
-  font-size: 1.1rem;
-  color: #111827;
-  font-weight: 900;
+.dashboard-content.map .map-section {
+  grid-area: auto;
+  height: 100%;
+  min-height: 560px;
+  max-height: none;
 }
 
-.incident-detail-panel p {
-  margin: 0.75rem 0;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: #475569;
+.dashboard-content.map .map-wrapper {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
 }
 
-.incident-description {
-  white-space: pre-line;
+.incident-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
 }
 
-.status {
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
+.incident-action-btn {
+  border-radius: 10px;
+  padding: 0.55rem 0.9rem;
   font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.status-pendiente {
-  background-color: #fee2e2;
-  color: #b91c1c;
-}
-
-.status-atendido,
-.status-en-proceso {
-  background-color: #fef3c7;
-  color: #b45309;
-}
-
-.status-cerrado {
-  background-color: #dcfce7;
-  color: #166534;
-}
-
-.take-case-btn {
-  width: 100%;
-  margin-top: 0.75rem;
-  padding: 0.75rem 1rem;
-  border: none;
-  border-radius: 12px;
-  background: #0f2a4a;
-  color: #ffffff;
   font-weight: 800;
   cursor: pointer;
   transition: 0.2s ease;
 }
 
-.take-case-btn:hover:not(:disabled) {
+.incident-action-btn.primary {
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.incident-action-btn.primary:hover {
+  background: #1d4ed8;
+}
+
+.incident-action-btn.secondary {
+  background: #ffffff;
+  color: #0f2a4a;
+  border: 1px solid #cbd5e1;
+}
+
+.incident-action-btn.secondary:hover {
+  background: #f1f5f9;
+}
+
+.incident-action-btn.map {
+  border: none;
+  background: #0f2a4a;
+  color: #ffffff;
+}
+
+.incident-action-btn.map:hover {
   background: #143b69;
-  transform: translateY(-1px);
 }
 
-.take-case-btn:disabled {
-  background: #cbd5e1;
+.dashboard-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 0.65rem 0.75rem;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+}
+
+.clear-filters-btn {
+  height: 38px;
+  align-self: end;
+  padding: 0 1rem;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f2a4a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+}
+
+.clear-filters-btn:hover {
+  background: #f1f5f9;
+}
+
+.incident-action-btn.danger {
+  border: none;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.incident-action-btn.danger:hover {
+  background: #b91c1c;
+}
+.admin-users-panel {
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.admin-summary-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #f8fafc;
+  padding: 1rem;
+}
+
+.admin-summary-card span {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.admin-summary-card strong {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 1.8rem;
+  color: #0f172a;
+}
+
+.admin-users-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-users-toolbar h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.admin-users-toolbar p {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
   color: #64748b;
-  cursor: not-allowed;
 }
 
-.busy-message {
-  margin-top: 0.75rem;
-  color: #dc2626 !important;
-  font-size: 0.8rem !important;
+.admin-role-select {
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  padding: 0 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f2a4a;
+}
+
+.admin-table-wrapper {
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+}
+
+.admin-users-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  font-size: 0.85rem;
+}
+
+.admin-users-table th {
+  text-align: left;
+  padding: 0.85rem;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.admin-users-table td {
+  padding: 0.85rem;
+  border-top: 1px solid #e5e7eb;
+  color: #334155;
+}
+
+.role-badge {
+  display: inline-flex;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.role-guardia,
+.role-guard {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.role-estudiante,
+.role-usuario {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.role-admin,
+.role-administrador {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.admin-empty-state {
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.admin-zones-panel {
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-zones-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.admin-zone-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 1rem;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+.admin-zone-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.admin-zone-color {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+.admin-zone-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.admin-zone-header p {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.admin-zone-description {
+  margin: 0.9rem 0;
+  color: #475569;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.admin-zone-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.admin-stats-section {
+  grid-column: 1 / -1;
+  min-height: 0;
+}
+
+.admin-stats-panel {
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.admin-stat-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #f8fafc;
+  padding: 1rem;
+}
+
+.admin-stat-card span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.admin-stat-card strong {
+  display: block;
+  margin-top: 0.6rem;
+  font-size: 2rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.admin-stat-card.danger {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.admin-stat-card.danger strong {
+  color: #be123c;
+}
+
+.admin-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.admin-chart-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 1rem;
+}
+
+.admin-chart-card h3 {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.admin-bars {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.admin-bar-row {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.admin-bar-info {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.82rem;
+  color: #334155;
+}
+
+.admin-bar-info span {
   font-weight: 700;
 }
 
-/* Tablet */
-@media (max-width: 1024px) {
-  .dashboard-content.split {
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
+.admin-bar-info strong {
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.admin-bar-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.admin-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #0f2a4a;
+}
+
+.admin-empty-chart {
+  margin: 0;
+  padding: 1rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  color: #64748b;
+  text-align: center;
+  background: #f8fafc;
+}
+
+@media (max-width: 1100px) {
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.chart-box {
+  width: 100%;
+  height: 260px;
+}
+
+.admin-chart-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 1rem;
+  min-height: 330px;
+}
+
+.admin-chart-card h3 {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+/* Paneles completos para módulos de administrador */
+.admin-users-section,
+.admin-zones-section,
+.admin-stats-section {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+.admin-users-section {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: calc(100dvh - 175px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.admin-users-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.admin-table-wrapper {
+  max-height: 430px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+}
+
+.admin-users-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8fafc;
+}
+
+/* Panel de usuarios más alto y estable */
+.admin-users-section {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: calc(100dvh - 145px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Contenido interno con scroll */
+.admin-users-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Evita que las tarjetas superiores se estiren */
+.admin-summary-grid {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.admin-summary-card {
+  min-height: 110px;
+  max-height: 110px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* La tabla ocupa el espacio restante */
+.admin-table-wrapper {
+  flex: 1;
+  min-height: 260px;
+  max-height: none;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+}
+
+/* Encabezado fijo de la tabla */
+.admin-users-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8fafc;
+}
+/* Ajustar Gestión de usuarios al alto del panel lateral */
+.admin-users-section {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: calc(100dvh - 20px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* El contenido interno ocupa todo el espacio */
+.admin-users-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Tarjetas superiores fijas, sin estirarse */
+.admin-summary-grid {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.admin-summary-card {
+  height: 110px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Barra de título/filtro fija */
+.admin-users-toolbar {
+  flex: none;
+}
+
+/* La tabla baja hasta el final del panel */
+.admin-table-wrapper {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+}
+
+/* Encabezado fijo mientras bajas */
+.admin-users-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8fafc;
+}
+/* Ajustar Gestión de zonas al alto del panel lateral */
+.admin-zones-section {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: calc(100dvh - 20px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Contenido interno de zonas */
+.admin-zones-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Grid de tarjetas de zonas */
+.admin-zones-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-content: start;
+  gap: 1rem;
+  padding-right: 0.4rem;
+}
+
+/* Tarjetas de zonas estables */
+.admin-zone-card {
+  min-height: 210px;
+  height: auto;
+}
+
+
+
+
+
+.admin-zone-card-clickable {
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.admin-zone-card-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+}
+
+.admin-zone-edit-btn {
+  margin-top: 0.75rem;
+  border: none;
+  border-radius: 10px;
+  background: #0f2a4a;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+}
+
+.admin-zone-map-editor {
+  grid-column: 1 / -1;
+  height: calc(100dvh - 120px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.zone-editor-layout {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 1rem;
+  padding: 1rem;
+  min-height: 0;
+}
+
+.zone-editor-map {
+  min-height: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.zone-editor-panel {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  overflow-y: auto;
+}
+
+.zone-editor-panel h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.zone-editor-panel label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.zone-editor-panel label span {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.zone-editor-panel input,
+.zone-editor-panel textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.zone-editor-panel textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.zone-editor-save,
+.zone-editor-delete,
+.zone-editor-cancel {
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.zone-editor-save {
+  background: #0f2a4a;
+  color: #ffffff;
+}
+
+.zone-editor-delete {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.zone-editor-cancel {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+/* Vista mapa para gestión de zonas */
+.admin-zone-map-section {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: calc(100dvh - 120px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.admin-zone-map-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.admin-zone-map-box {
+  min-height: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.admin-zone-map-sidebar {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.admin-zone-map-sidebar-header {
+  flex: none;
+}
+
+.admin-zone-map-sidebar-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.admin-zone-map-sidebar-header p {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.admin-zone-selected-card {
+  flex: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 1rem;
+}
+
+.admin-zone-selected-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.admin-zone-selected-title h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.admin-zone-selected-title p {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.admin-zone-selected-card > p {
+  margin: 0.85rem 0;
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.admin-zone-selected-meta {
+  display: grid;
+  gap: 0.3rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.admin-zone-edit-btn.full {
+  width: 100%;
+}
+
+.admin-zone-map-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.5rem;
+  padding-right: 0.35rem;
+}
+
+.admin-zone-map-item {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  cursor: pointer;
+  text-align: left;
+  transition: 0.2s ease;
+}
+
+.admin-zone-map-item:hover {
+  background: #f8fafc;
+}
+
+.admin-zone-map-item.active {
+  border-color: #0f2a4a;
+  background: #eef4ff;
+}
+
+.admin-zone-map-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  flex: none;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+.admin-zone-map-item strong {
+  display: block;
+  font-size: 0.8rem;
+  color: #0f172a;
+}
+
+.admin-zone-map-item small {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+@media (max-width: 1000px) {
+  .admin-zone-map-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-zone-map-sidebar {
+    max-height: 420px;
   }
 }
 
-/* Celular */
+/* =========================
+   RESPONSIVE SOLO GUARDIA
+   ========================= */
+
 @media (max-width: 768px) {
-  .guard-dashboard {
-    height: auto;
-    min-height: 100dvh;
-    overflow: visible;
+  .guard-dashboard .dashboard-main {
+    padding: 0.75rem;
   }
 
-  .dashboard-main {
+.guard-dashboard.guard-view .dashboard-layout{
     display: flex;
     flex-direction: column;
-    padding: 0.65rem;
-    gap: 0.7rem;
-    overflow: visible;
+    gap: 1rem;
   }
 
-  .dashboard-toolbar {
-    grid-template-columns: 1fr;
-    padding: 0.55rem;
+  .guard-dashboard .dashboard-sidebar {
+    width: 100%;
+    min-height: auto;
+    padding: 1rem;
+    border-radius: 20px;
   }
 
-  .view-toggle {
-    display: none;
+  .guard-dashboard .sidebar-top {
+    margin-bottom: 0.75rem;
   }
 
-  .dashboard-content,
-  .dashboard-content.split,
-  .dashboard-content.map,
-  .dashboard-content.list {
+  .guard-dashboard .sidebar-title {
+    font-size: 1.3rem;
+  }
+
+  .guard-dashboard .sidebar-user {
+    padding: 0.8rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .guard-dashboard .sidebar-menu {
+    display: flex;
+    flex-direction: row;
+    gap: 0.6rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+
+  .guard-dashboard .sidebar-item {
+    flex: 0 0 auto;
+    min-width: 135px;
+    padding: 0.8rem 1rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .guard-dashboard .dashboard-body {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .guard-dashboard .dashboard-toolbar {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    overflow: visible;
+    align-items: stretch;
+    padding: 0.75rem;
   }
 
-  .map-section {
-    height: 42vh;
-    min-height: 300px;
-    flex: none;
+  .guard-dashboard .dashboard-search {
+    width: 100%;
   }
 
-  .list-section {
+  .guard-dashboard .search-panel {
+    margin-bottom: 0;
+    padding: 0.75rem;
+  }
+
+  .guard-dashboard .search-fields {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .guard-dashboard .clear-filters-btn {
+    width: 100%;
+    height: 42px;
+  }
+
+  .guard-dashboard .view-toggle {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .guard-dashboard .toggle-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .guard-dashboard .dashboard-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .guard-dashboard .map-section {
+    width: 100%;
+  }
+
+  .guard-dashboard .map-wrapper {
+    height: 420px;
+    min-height: 420px;
+  }
+
+  .guard-dashboard .bottom-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .guard-dashboard .summary-card {
+    min-height: 100px;
+  }
+
+  .guard-dashboard .list-section {
+    width: 100%;
+    max-height: none;
+  }
+
+  .guard-dashboard .incident-list-scroll {
+    max-height: 520px;
+    overflow-y: auto;
+  }
+
+  .guard-dashboard .section-header {
+    padding: 1rem;
+  }
+
+  .guard-dashboard .section-header h2 {
+    font-size: 1rem;
+  }
+
+  .guard-dashboard .section-header p {
+    font-size: 0.78rem;
+  }
+}
+
+
+
+@media (max-width: 480px) {
+  .guard-dashboard .dashboard-main {
+    padding: 0.5rem;
+  }
+
+  .guard-dashboard .dashboard-sidebar {
+    border-radius: 18px;
+  }
+
+  .guard-dashboard .sidebar-user {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .guard-dashboard .sidebar-avatar {
+    width: 44px;
+    height: 44px;
+    font-size: 1rem;
+  }
+
+  .guard-dashboard .sidebar-user-name {
+    font-size: 0.9rem;
+  }
+
+  .guard-dashboard .sidebar-user-email {
+    font-size: 0.75rem;
+  }
+
+  .guard-dashboard .map-wrapper {
+    height: 360px;
+    min-height: 360px;
+  }
+
+  .guard-dashboard .incident-list-scroll {
+    max-height: 460px;
+  }
+
+  .guard-dashboard .fixed .bg-white {
+    max-width: 95vw;
+  }
+}
+
+/* ==============================
+   RESPONSIVE GUARDIA - CELULAR
+   ============================== */
+
+.mobile-search-toggle {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .guard-dashboard.guard-view .dashboard-main {
+    padding: 0.75rem;
+  }
+
+  .guard-dashboard.guard-view .dashboard-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .guard-dashboard.guard-view .dashboard-sidebar {
+    width: 100%;
     min-height: auto;
-    flex: none;
+    padding: 1rem;
+    border-radius: 20px;
   }
 
-  .incident-list-scroll {
-    overflow: visible;
-    padding: 0.55rem;
+  .guard-dashboard.guard-view .sidebar-menu {
+    display: flex;
+    flex-direction: row;
+    gap: 0.6rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
   }
 
-  .incident-list-scroll > * {
-    overflow: visible !important;
-    max-height: none !important;
+  .guard-dashboard.guard-view .sidebar-item {
+    flex: 0 0 auto;
+    min-width: 135px;
+    text-align: center;
+    white-space: nowrap;
   }
 
-  .incident-detail-panel {
-    width: auto;
-    left: 0.75rem;
-    right: 0.75rem;
-    bottom: 0.75rem;
-    max-height: 55vh;
-    border-radius: 16px;
+  .guard-dashboard.guard-view .dashboard-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+    padding: 0.75rem;
+  }
+
+  .guard-dashboard.guard-view .mobile-search-toggle {
+    display: block;
+    width: 100%;
+  }
+
+  .guard-dashboard.guard-view .mobile-search-btn {
+    width: 100%;
+    height: 44px;
+    border: none;
+    border-radius: 14px;
+    background: #0f2a4a;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  .guard-dashboard.guard-view .dashboard-search.filters-closed {
+    display: none;
+  }
+
+  .guard-dashboard.guard-view .dashboard-search.filters-open {
+    display: block;
+    width: 100%;
+  }
+
+  .guard-dashboard.guard-view .search-panel {
+    margin-bottom: 0;
+    padding: 1rem;
+  }
+
+  .guard-dashboard.guard-view .search-fields {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .guard-dashboard.guard-view .clear-filters-btn {
+    width: 100%;
+    height: 42px;
+  }
+
+  .guard-dashboard.guard-view .view-toggle {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .guard-dashboard.guard-view .toggle-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .guard-dashboard.guard-view .dashboard-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .guard-dashboard.guard-view .map-section {
+    width: 100%;
+    order: 1;
+  }
+
+  .guard-dashboard.guard-view .list-section {
+    width: 100%;
+    order: 2;
+  }
+
+  .guard-dashboard.guard-view .bottom-cards {
+    order: 3;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .guard-dashboard.guard-view .map-wrapper {
+    height: 520px;
+    min-height: 520px;
+  }
+
+  .guard-dashboard.guard-view .incident-list-scroll {
+    max-height: 520px;
+    overflow-y: auto;
+  }
+
+  .guard-dashboard.guard-view .summary-card {
+    min-height: 105px;
   }
 }
 
 @media (max-width: 480px) {
-  .dashboard-main {
-    padding: 0.55rem;
+  .guard-dashboard.guard-view .map-wrapper {
+height: 72vh;
+min-height: 620px;
   }
 
-  .map-section {
-    height: 40vh;
-    min-height: 270px;
+  .guard-dashboard.guard-view .incident-list-scroll {
+    max-height: 460px;
+  }
+}
+
+/* Mapa más alto en celular - Guardia */
+@media (max-width: 768px) {
+  .guard-dashboard.guard-view .map-section {
+    min-height: auto;
   }
 
-  .compact-header {
-    padding: 0.65rem 0.75rem;
+  .guard-dashboard.guard-view .map-section .map-wrapper {
+    height: 62vh !important;
+    min-height: 520px !important;
+    max-height: none !important;
   }
 
-  .section-header h2 {
-    font-size: 0.95rem;
+  .guard-dashboard.guard-view .map-section .map-wrapper > div {
+    height: 100% !important;
+  }
+}
+@media (max-width: 480px) {
+  .guard-dashboard.guard-view .map-section .map-wrapper {
+    height: 65vh !important;
+    min-height: 560px !important;
+  }
+}
+
+/* Hacer más largo todo el cuadro del mapa en celular */
+@media (max-width: 768px) {
+  .guard-dashboard.guard-view .map-section {
+    min-height: 680px !important;
+    display: flex;
+    flex-direction: column;
   }
 
-  .section-header p {
-    font-size: 0.72rem;
+  .guard-dashboard.guard-view .map-section .section-header {
+    flex: none;
   }
 
-  .incident-detail-panel {
-    left: 0.5rem;
-    right: 0.5rem;
-    bottom: 0.5rem;
-    padding: 1rem;
+  .guard-dashboard.guard-view .map-section .map-wrapper {
+    flex: 1;
+    height: auto !important;
+    min-height: 570px !important;
   }
+}
+
+@media (max-width: 480px) {
+  .guard-dashboard.guard-view .map-section {
+    min-height: 620px !important;
+  }
+
+  .guard-dashboard.guard-view .map-section .map-wrapper {
+    min-height: 610px !important;
+  }
+}
+
+/* ==============================
+   HEADER STICKY EN CELULAR - GUARDIA
+   ============================== */
+
+@media (max-width: 768px) {
+  .guard-dashboard.guard-view > header,
+  .guard-dashboard.guard-view .app-header,
+  .guard-dashboard.guard-view .main-header {
+    position: sticky;
+    top: 0;
+    z-index: 3000;
+  }
+
+  .guard-dashboard.guard-view {
+    overflow: visible;
+  }
+
+  .guard-dashboard.guard-view .dashboard-main {
+    overflow: visible;
+  }
+}
+@media (max-width: 768px) {
+  .guard-dashboard.guard-view > header {
+    min-height: auto;
+  }
+}
+
+/* Quitar header fijo/sticky en celular para guardia */
+@media (max-width: 768px) {
+  .guard-dashboard.guard-view > header,
+  .guard-dashboard.guard-view .app-header,
+  .guard-dashboard.guard-view .main-header {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+  }
+
+  .guard-dashboard.guard-view {
+    overflow: visible !important;
+  }
+
+  .guard-dashboard.guard-view .dashboard-main {
+    overflow: visible !important;
+  }
+}
+
+.duty-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #f8fafc;
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.duty-label {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.duty-on {
+  display: block;
+  margin-top: 0.25rem;
+  color: #15803d;
+  font-size: 0.95rem;
+}
+
+.duty-off {
+  display: block;
+  margin-top: 0.25rem;
+  color: #b91c1c;
+  font-size: 0.95rem;
+}
+
+.duty-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.duty-btn.on {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.duty-btn.off {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.off-duty-panel {
+  max-width: 560px;
+  margin: 4rem auto;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 24px;
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+}
+
+.off-duty-panel h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.off-duty-panel p {
+  margin: 0.75rem 0 1.5rem;
+  color: #64748b;
+}
+
+.off-duty-panel button {
+  border: none;
+  border-radius: 14px;
+  background: #0f2a4a;
+  color: white;
+  padding: 0.85rem 1.2rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+/* Estado de servicio desplegable */
+.duty-collapsible {
+  padding: 0;
+  overflow: hidden;
+}
+
+.duty-header-btn {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  cursor: pointer;
+}
+
+.duty-header-btn:hover {
+  background: #f1f5f9;
+}
+
+.duty-options {
+  padding: 0 1rem 1rem;
+}
+
+.duty-arrow {
+  font-size: 1rem;
+  font-weight: 900;
+  color: #475569;
+  transition: transform 0.2s ease;
+}
+
+.duty-arrow.open {
+  transform: rotate(180deg);
 }
