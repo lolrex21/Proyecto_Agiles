@@ -1,162 +1,297 @@
-  /* src/components/Guard/GuardDashboard.css */
+/* src/components/Guard/GuardDashboard.css */
 
-  .guard-dashboard {
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    background: #f3f4f6;
-    overflow: hidden;
-  }
+/* =========================================================
+   BASE GENERAL
+   ========================================================= */
 
-  .dashboard-main {
-    flex: 1;
-    min-height: 0;
-    width: 100%;
-    max-width: 1520px;
-    margin: 0 auto;
-    padding: 0.75rem 1rem 1rem;
-    overflow: hidden;
-  }
+.guard-dashboard {
+  width: 100%;
+  min-height: 100dvh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #f3f4f6;
+  overflow: hidden;
+}
 
-  .dashboard-layout {
-    display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
-    gap: 1rem;
-    min-height: calc(100dvh - 4.5rem);
-  }
+.dashboard-main {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
+  overflow: hidden;
+}
 
-  .dashboard-sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 24px;
-    padding: 1.25rem;
-    box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
-  }
+.dashboard-main.admin-main,
+.dashboard-main.guard-main {
+  display: grid;
+  align-items: stretch;
+  gap: 0.65rem;
+}
 
-  .sidebar-top {
-    display: grid;
-    gap: 0.35rem;
-  }
+/* =========================================================
+   SIDEBAR GENERAL
+   ========================================================= */
 
-  .sidebar-label {
-    margin: 0;
-    font-size: 0.7rem;
-    font-weight: 800;
-    color: #0f2a4a;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-  }
+.lateral-panel {
+  min-height: 0;
+  height: 100%;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
-  .sidebar-title {
-    margin: 0;
-    font-size: 1.4rem;
-    font-weight: 900;
-    color: #0f172a;
-  }
+.sidebar-top {
+  display: grid;
+  gap: 0.35rem;
+}
 
-  .sidebar-subtitle {
-    margin: 0;
-    font-size: 0.85rem;
-    color: #64748b;
-  }
+.sidebar-label {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #0f2a4a;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
 
-  .sidebar-user {
-    display: flex;
-    align-items: center;
-    gap: 0.9rem;
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
-    border-radius: 18px;
-    padding: 1rem;
-  }
+.sidebar-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #0f172a;
+}
 
-  .sidebar-avatar {
-    width: 46px;
-    height: 46px;
-    border-radius: 14px;
-    background: #0f2a4a;
-    color: #ffffff;
-    display: grid;
-    place-items: center;
-    font-weight: 900;
-    font-size: 1.1rem;
-  }
+.sidebar-subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #64748b;
+  line-height: 1.35;
+}
 
-  .sidebar-user-name {
-    margin: 0;
-    font-weight: 800;
-    color: #0f172a;
-  }
+.sidebar-menu {
+  display: grid;
+  gap: 0.45rem;
+  overflow-y: auto;
+  padding-right: 0.1rem;
+}
 
-  .sidebar-user-email {
-    margin: 0.25rem 0 0;
-    font-size: 0.85rem;
-    color: #64748b;
-  }
+.sidebar-item {
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  padding: 0.85rem 0.95rem;
+  border-radius: 15px;
+  border: 1px solid transparent;
+  background: #eef2ff;
+  color: #0f2a4a;
+  font-weight: 850;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease,
+    border-color 0.2s ease;
+}
 
-  .sidebar-menu {
-    display: grid;
-    gap: 0.35rem;
-  }
+.sidebar-item:hover {
+  transform: translateX(2px);
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
 
-  .sidebar-item {
-    text-align: left;
-    padding: 0.95rem 1rem;
-    border-radius: 16px;
-    border: 1px solid transparent;
-    background: #eef2ff;
-    color: #0f2a4a;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
+.sidebar-item.active {
+  background: #0f2a4a;
+  color: #ffffff;
+  border-color: rgba(15, 42, 74, 0.2);
+  box-shadow: 0 10px 24px rgba(15, 42, 74, 0.18);
+}
 
-  .sidebar-item:hover,
-  .sidebar-item.active {
-    background: #0f2a4a;
-    color: #ffffff;
-    border-color: rgba(15, 42, 74, 0.15);
-  }
+.sidebar-collapse-btn {
+  width: 100%;
+  height: 38px;
+  border: 0;
+  border-radius: 14px;
+  background: #0f2a4a;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(15, 42, 74, 0.18);
+}
 
-  .dashboard-body {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
+/* =========================================================
+   ADMIN LAYOUT FULL WIDTH / FULL HEIGHT
+   ========================================================= */
 
-  .dashboard-cards {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1rem;
-  }
+.guard-dashboard.admin-view {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
 
-  .summary-card {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 110px;
-    padding: 1.3rem;
-    border-radius: 24px;
-    border: 1px solid #e5e7eb;
-  }
+.guard-dashboard.admin-view .dashboard-main.admin-main {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  width: 100vw;
+  max-width: none;
+  margin: 0;
+  padding: 0.5rem;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 0.5rem;
+  overflow: hidden;
+}
 
-  .summary-label {
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: #475569;
-    text-transform: uppercase;
-  }
+.guard-dashboard.admin-view .dashboard-main.admin-main.sidebar-collapsed {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
 
-  .summary-number {
-    margin-top: 0.85rem;
-    font-size: 2.25rem;
-    font-weight: 900;
-    color: #0f172a;
-  }
+.guard-dashboard.admin-view .lateral-panel.admin-sidebar {
+  min-width: 0;
+  padding: 0.8rem;
+  gap: 0.85rem;
+}
+
+.guard-dashboard.admin-view .lateral-panel.admin-sidebar.collapsed {
+  align-items: center;
+  padding-inline: 0.45rem;
+}
+
+.guard-dashboard.admin-view .admin-sidebar.collapsed .sidebar-collapse-btn {
+  width: 44px;
+}
+
+.guard-dashboard.admin-view .admin-sidebar-top {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.guard-dashboard.admin-view .admin-sidebar.collapsed .sidebar-item {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.guard-dashboard.admin-view .admin-sidebar.collapsed .sidebar-item-text {
+  max-width: 1.2rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: clip;
+  font-size: 0.74rem;
+}
+
+.guard-dashboard.admin-view .dashboard-body {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .dashboard-toolbar {
+  flex: none;
+}
+
+.guard-dashboard.admin-view .dashboard-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+/* CLAVE: en admin no dejamos fila vacía para bottom-cards */
+.guard-dashboard.admin-view .dashboard-content.split,
+.guard-dashboard.admin-view .dashboard-content.map,
+.guard-dashboard.admin-view .dashboard-content.list {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'map';
+}
+
+.guard-dashboard.admin-view .dashboard-cards.bottom-cards {
+  display: none !important;
+}
+
+/* =========================================================
+   GUARDIA LAYOUT
+   ========================================================= */
+
+.guard-dashboard.guard-view .dashboard-main.guard-main {
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: 0;
+  height: auto;
+}
+
+.guard-dashboard.guard-view .lateral-panel.guard-sidebar {
+  padding: 1rem;
+  gap: 0.85rem;
+}
+
+.guard-dashboard.guard-view .dashboard-body {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.guard-dashboard.guard-view .dashboard-toolbar {
+  display: none;
+}
+
+.guard-dashboard.guard-view .dashboard-cards.bottom-cards {
+  display: none;
+}
+
+.guard-dashboard.guard-view .dashboard-content {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.guard-dashboard.guard-view .dashboard-content.split {
+  grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.8fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'map list';
+}
+
+.guard-dashboard.guard-view .dashboard-content.map {
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'map';
+}
+
+.guard-dashboard.guard-view .dashboard-content.list {
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'list';
+}
+
+/* =========================================================
+   TOOLBAR / FILTROS
+   ========================================================= */
 
 .dashboard-toolbar {
   display: grid;
@@ -170,553 +305,10 @@
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
 }
 
-  .dashboard-search {
-    min-width: 0;
-  }
-
-  .dashboard-content {
-    min-height: 0;
-    display: grid;
-    gap: 0.9rem;
-    overflow: hidden;
-  }
-
-  .dashboard-content.split {
-    grid-template-columns: minmax(0, 1.55fr) minmax(420px, 0.85fr);
-  }
-
-  .dashboard-content.map,
-  .dashboard-content.list {
-    grid-template-columns: 1fr;
-  }
-
-  .dashboard-card {
-    min-height: 0;
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 18px;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .section-header {
-    flex-shrink: 0;
-    border-bottom: 1px solid #e5e7eb;
-    background: #ffffff;
-  }
-
-  .compact-header {
-    padding: 0.75rem 0.9rem;
-  }
-
-  .section-header h2 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 900;
-    color: #0f172a;
-  }
-
-  .section-header p {
-    margin: 0.2rem 0 0;
-    font-size: 0.76rem;
-    color: #64748b;
-  }
-
-  /* Aquí evitamos que el buscador parezca una tarjeta gigante */
-  .dashboard-search {
-    min-width: 0;
-  }
-
-  /* El SearchBar maneja su propio título de filtros */
-  .dashboard-search h1,
-  .dashboard-search h2,
-  .dashboard-search h3 {
-    display: block;
-  }
-
-  /* Si el SearchBar tiene una tarjeta interna, le quitamos exceso */
-  .dashboard-search > div {
-    margin: 0 !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-    background: transparent !important;
-  }
-
-  /* Botones de vista más discretos */
-  .view-toggle {
-    display: inline-flex;
-    gap: 0.25rem;
-    background: #f1f5f9;
-    padding: 0.25rem;
-    border-radius: 12px;
-    border: 1px solid #e5e7eb;
-  }
-
-  .toggle-btn {
-    padding: 0.45rem 0.75rem;
-    border: 0;
-    background: transparent;
-    color: #475569;
-    border-radius: 9px;
-    font-size: 0.78rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: 0.2s ease;
-  }
-
-  .toggle-btn:hover {
-    background: #e2e8f0;
-    color: #0f172a;
-  }
-
-  .toggle-btn.active {
-    background: #0f2a4a;
-    color: #ffffff;
-    box-shadow: 0 4px 10px rgba(15, 42, 74, 0.22);
-  }
-
-  /* Layout principal más grande */
-  .dashboard-content {
-    min-height: 0;
-    display: grid;
-    gap: 0.9rem;
-    overflow: hidden;
-  }
-
-.dashboard-content.split {
-  grid-template-columns: minmax(0, 1.55fr) minmax(420px, 0.85fr);
-  grid-template-rows: minmax(420px, 1fr) auto;
-  grid-template-areas:
-    'map list'
-    'cards list';
-  min-height: 0;
+.dashboard-search {
+  min-width: 0;
 }
 
-  .dashboard-content.map,
-  .dashboard-content.list {
-    grid-template-columns: 1fr;
-  }
-
-  .map-section {
-    grid-area: map;
-    overflow: hidden;
-    min-height: 520px;
-    max-height: 700px;
-  }
-
-  .bottom-cards {
-    grid-area: cards;
-  }
-
-  .list-section {
-    grid-area: list;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .dashboard-card {
-    min-height: 0;
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 18px;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .section-header {
-    flex-shrink: 0;
-    border-bottom: 1px solid #e5e7eb;
-    background: #ffffff;
-  }
-
-  .compact-header {
-    padding: 0.75rem 0.9rem;
-  }
-
-  .section-header h2 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 900;
-    color: #0f172a;
-  }
-
-  .section-header p {
-    margin: 0.2rem 0 0;
-    font-size: 0.76rem;
-    color: #64748b;
-  }
-
-  /* Mapa más grande */
-.map-section {
-  grid-area: map;
-  overflow: hidden;
-  min-height: 0;
-  height: 100%;
-  max-height: none;
-}
-
-.map-wrapper {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-  position: relative;
-}
-
-  /* Lista más grande, un solo scroll */
-  .list-section {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .incident-list-scroll {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 0.6rem;
-  }
-
-  /* Quita scroll interno duplicado del IncidentList */
-  .incident-list-scroll > * {
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
-
-  /* Si dentro de IncidentList hay contenedores con overflow, los neutralizamos */
-  .incident-list-scroll div {
-    scrollbar-width: thin;
-  }
-
-  .incident-list-scroll::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  .incident-list-scroll::-webkit-scrollbar-track {
-    background: #f1f5f9;
-  }
-
-  .incident-list-scroll::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 999px;
-  }
-
-  .incident-list-scroll::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-  }
-
-  /* Sección de estadísticas */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-    padding: 1rem;
-  }
-
-  .stats-card {
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
-    border-radius: 18px;
-    padding: 1rem;
-  }
-
-  .stats-title {
-    margin: 0;
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: #475569;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .stats-number {
-    margin-top: 0.75rem;
-    font-size: 2rem;
-    font-weight: 900;
-    color: #0f172a;
-  }
-
-  /* Panel flotante */
-  .incident-detail-panel {
-    position: fixed;
-    right: 1rem;
-    bottom: 1rem;
-    width: 340px;
-    background-color: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 18px;
-    padding: 1.25rem;
-    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
-    max-height: 430px;
-    overflow-y: auto;
-    z-index: 200;
-    animation: slideIn 0.25s ease;
-  }
-
-  @keyframes slideIn {
-    from {
-      transform: translateX(420px);
-      opacity: 0;
-    }
-
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
-  }
-
-  .close-btn {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    background: #f1f5f9;
-    border: none;
-    font-size: 1rem;
-    cursor: pointer;
-    color: #64748b;
-    width: 32px;
-    height: 32px;
-    border-radius: 999px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .close-btn:hover {
-    color: #111827;
-    background-color: #e2e8f0;
-  }
-
-  .incident-detail-panel h3 {
-    margin: 0 2rem 0.8rem 0;
-    font-size: 1.1rem;
-    color: #111827;
-    font-weight: 900;
-  }
-
-  .incident-detail-panel p {
-    margin: 0.75rem 0;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    color: #475569;
-  }
-
-  .incident-description {
-    white-space: pre-line;
-  }
-
-  .status {
-    padding: 0.25rem 0.55rem;
-    border-radius: 999px;
-    font-size: 0.78rem;
-    font-weight: 800;
-  }
-
-  .status-pendiente {
-    background-color: #fee2e2;
-    color: #b91c1c;
-  }
-
-  .status-atendido,
-  .status-en-proceso {
-    background-color: #fef3c7;
-    color: #b45309;
-  }
-
-  .status-cerrado {
-    background-color: #dcfce7;
-    color: #166534;
-  }
-
-  .take-case-btn {
-    width: 100%;
-    margin-top: 0.75rem;
-    padding: 0.75rem 1rem;
-    border: none;
-    border-radius: 12px;
-    background: #0f2a4a;
-    color: #ffffff;
-    font-weight: 800;
-    cursor: pointer;
-    transition: 0.2s ease;
-  }
-
-  .take-case-btn:hover:not(:disabled) {
-    background: #143b69;
-    transform: translateY(-1px);
-  }
-
-  .take-case-btn:disabled {
-    background: #cbd5e1;
-    color: #64748b;
-    cursor: not-allowed;
-  }
-
-  .busy-message {
-    margin-top: 0.75rem;
-    color: #dc2626 !important;
-    font-size: 0.8rem !important;
-    font-weight: 700;
-  }
-
-  /* Tablet */
-  @media (max-width: 1024px) {
-    .dashboard-content.split {
-      grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
-    }
-  }
-
-  /* Celular */
-  @media (max-width: 768px) {
-    .guard-dashboard {
-      height: auto;
-      min-height: 100dvh;
-      overflow: visible;
-    }
-
-    .dashboard-main {
-      display: flex;
-      flex-direction: column;
-      padding: 0.65rem;
-      gap: 0.7rem;
-      overflow: visible;
-    }
-
-    .dashboard-toolbar {
-      grid-template-columns: 1fr;
-      padding: 0.55rem;
-    }
-
-    .view-toggle {
-      display: none;
-    }
-
-    .dashboard-content,
-    .dashboard-content.split,
-    .dashboard-content.map,
-    .dashboard-content.list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      overflow: visible;
-    }
-
-    .map-section {
-      height: 42vh;
-      min-height: 300px;
-      flex: none;
-    }
-
-    .list-section {
-      min-height: auto;
-      flex: none;
-    }
-
-    .incident-list-scroll {
-      overflow: visible;
-      padding: 0.55rem;
-    }
-
-    .incident-list-scroll > * {
-      overflow: visible !important;
-      max-height: none !important;
-    }
-
-    .incident-detail-panel {
-      width: auto;
-      left: 0.75rem;
-      right: 0.75rem;
-      bottom: 0.75rem;
-      max-height: 55vh;
-      border-radius: 16px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .dashboard-main {
-      padding: 0.55rem;
-    }
-
-    .map-section {
-      height: 40vh;
-      min-height: 270px;
-    }
-
-    .compact-header {
-      padding: 0.65rem 0.75rem;
-    }
-
-    .section-header h2 {
-      font-size: 0.95rem;
-    }
-
-    .section-header p {
-      font-size: 0.72rem;
-    }
-
-    .incident-detail-panel {
-      left: 0.5rem;
-      right: 0.5rem;
-      bottom: 0.5rem;
-      padding: 1rem;
-    }
-  }
-
-  .list-section {
-  grid-area: list;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-}
-
-/* PANEL DERECHO MÁS LARGO */
-.dashboard-content.split {
-  grid-template-columns: minmax(0, 1.55fr) minmax(420px, 0.85fr);
-  grid-template-rows: 580px 130px;
-  grid-template-areas:
-    'map list'
-    'cards list';
-  min-height: 0;
-}
-
-/* El panel de incidentes ocupa todo el alto de mapa + tarjetas */
-.list-section {
-  grid-area: list;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-}
-
-/* Solo esta parte tendrá scroll */
-.incident-list-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 0.6rem;
-}
-
-/* Tarjetas inferiores */
-.bottom-cards {
-  grid-area: cards;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-/* Ajuste visual del panel de filtros */
 .dashboard-search > div {
   margin: 0 !important;
   padding: 0 !important;
@@ -735,7 +327,15 @@
   align-items: end;
 }
 
-/* Alinea los botones Dividida / Mapa / Lista con los inputs */
+.view-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  background: #f1f5f9;
+  padding: 0.25rem;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
 .view-toggle.compact {
   align-self: end;
   margin-bottom: 0.05rem;
@@ -745,33 +345,590 @@
   white-space: nowrap;
 }
 
-.view-toggle.compact .toggle-btn {
-  height: 34px;
+.toggle-btn {
+  padding: 0.45rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: #475569;
+  border-radius: 9px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.toggle-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.toggle-btn.active {
+  background: #0f2a4a;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(15, 42, 74, 0.22);
+}
+
+.clear-filters-btn {
+  height: 38px;
+  align-self: end;
+  padding: 0 1rem;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f2a4a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+}
+
+.clear-filters-btn:hover {
+  background: #f1f5f9;
+}
+
+/* =========================================================
+   CARDS / SECCIONES
+   ========================================================= */
+
+.dashboard-card {
+  min-height: 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-header {
+  flex: none;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.compact-header {
+  padding: 0.75rem 0.9rem;
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.section-header p {
+  margin: 0.2rem 0 0;
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 110px;
+  padding: 1.3rem;
+  border-radius: 24px;
+  border: 1px solid #e5e7eb;
+}
+
+.summary-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #475569;
+  text-transform: uppercase;
+}
+
+.summary-number {
+  margin-top: 0.85rem;
+  font-size: 2.25rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+/* =========================================================
+   MAPA
+   ========================================================= */
+
+.map-section {
+  grid-area: map;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.map-section .section-header {
+  flex: none;
+}
+
+.map-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.guard-map-wrapper {
+  position: relative;
+}
+
+/* Admin: mapa toma todo el alto disponible sin fila fantasma */
+.guard-dashboard.admin-view .map-section {
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+}
+
+.guard-dashboard.admin-view .map-section .section-header {
+  min-height: 52px;
+  padding: 0.65rem 0.85rem;
+}
+
+.guard-dashboard.admin-view .map-wrapper.guard-map-wrapper {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+/* Solo al primer hijo del wrapper, no al overlay */
+.guard-dashboard.admin-view .map-wrapper.guard-map-wrapper > div:first-child,
+.guard-dashboard.guard-view .map-wrapper.guard-map-wrapper > div:first-child {
+  height: 100% !important;
+  min-height: 100% !important;
+}
+
+/* Guardia */
+.guard-dashboard.guard-view .map-section {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.guard-dashboard.guard-view .map-wrapper.guard-map-wrapper {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+/* =========================================================
+   HEADER DEL MAPA + LEYENDA
+   ========================================================= */
+
+.guard-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.guard-map-header > div:first-child {
+  min-width: 0;
+}
+
+.guard-map-header .zone-legend-inline {
+  position: relative;
+  z-index: 45;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.guard-map-header .zone-legend-inline > button,
+.zone-legend-inline > button {
+  background: #ffffff;
+  color: #0f2a4a;
+  border: 1px solid #dbe3ef;
+  border-radius: 999px;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.7rem;
+  font-weight: 900;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  white-space: nowrap;
+}
+
+.zone-legend-inline > div {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.55rem);
+  width: min(430px, 88vw);
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  z-index: 500;
+}
+
+.zone-legend-floating {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 20;
+}
+
+/* =========================================================
+   MINI LISTA DENTRO DEL MAPA
+   ========================================================= */
+
+.guard-map-incident-list,
+.admin-map-incident-list {
+  position: absolute;
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+.guard-map-incident-list {
+  top: 5.25rem;
+  right: 0.55rem;
+  width: min(105px, 28vw);
+  max-height: min(30%, 170px);
+  padding: 0.26rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(1px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.035);
+  gap: 0.22rem;
+}
+
+.admin-map-incident-list {
+  top: 4.75rem;
+  right: 0.85rem;
+  width: min(330px, 34vw);
+  max-height: min(72%, 520px);
+  padding: 0.7rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(1px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  gap: 0.55rem;
+}
+
+.guard-map-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  color: rgba(15, 42, 74, 0.7);
+  padding-inline: 0.05rem;
+}
+
+.guard-map-list-header span {
+  font-size: 0.48rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.035em;
+}
+
+.guard-map-list-header strong {
+  min-width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.38);
+  color: rgba(15, 42, 74, 0.8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.48rem;
+  font-weight: 900;
+}
+
+.guard-map-list-scroll {
+  overflow-y: auto;
+  display: grid;
+  gap: 0.2rem;
+  padding-right: 0.04rem;
+}
+
+.admin-map-incident-list .guard-map-list-scroll {
+  max-height: 460px;
+  gap: 0.45rem;
+}
+
+.admin-map-incident-list .guard-map-list-header {
+  padding-inline: 0.15rem;
+}
+
+.admin-map-incident-list .guard-map-list-header span {
+  font-size: 0.72rem;
+}
+
+.admin-map-incident-list .guard-map-list-header strong {
+  min-width: 1.45rem;
+  height: 1.45rem;
+  font-size: 0.72rem;
+}
+
+.admin-map-incident-list .guard-map-incident-item {
+  padding: 0.65rem 0.75rem;
+  border-radius: 13px;
+}
+
+.admin-map-incident-list .guard-map-incident-title {
+  gap: 0.45rem;
+}
+
+.admin-map-incident-list .guard-map-incident-dot {
+  width: 0.62rem;
+  height: 0.62rem;
+}
+
+.admin-map-incident-list .guard-map-incident-item span {
+  font-size: 0.86rem;
+  max-width: 255px;
+}
+
+.guard-map-incident-item {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 0.26rem 0.28rem;
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(15, 42, 74, 0.9);
+  text-align: left;
+  cursor: pointer;
+  backdrop-filter: blur(1px);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.guard-map-incident-item:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.admin-map-incident-list .guard-map-incident-item {
+  padding: 0.3rem 0.32rem;
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.guard-map-incident-title {
+  display: flex;
+  align-items: center;
+  gap: 0.22rem;
+  min-width: 0;
+}
+
+.guard-map-incident-dot {
+  width: 0.36rem;
+  height: 0.36rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: rgba(107, 114, 128, 0.78);
+}
+
+.guard-map-incident-dot.type-robo {
+  background: rgba(239, 68, 68, 0.9);
+}
+
+.guard-map-incident-dot.type-pelea {
+  background: rgba(249, 115, 22, 0.9);
+}
+
+.guard-map-incident-dot.type-accidente {
+  background: rgba(37, 99, 235, 0.9);
+}
+
+.guard-map-incident-dot.type-otro {
+  background: rgba(107, 114, 128, 0.9);
+}
+
+.guard-map-incident-item span {
+  display: block;
+  font-size: 0.62rem;
+  line-height: 1.08;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-map-incident-list .guard-map-incident-item span {
+  font-size: 0.58rem;
+  max-width: 108px;
+}
+
+/* =========================================================
+   LISTA DE INCIDENTES
+   ========================================================= */
+
+.list-section {
+  grid-area: list;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.incident-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.6rem;
+}
+
+.incident-list-scroll > * {
+  height: auto !important;
+  max-height: none !important;
+}
+
+.incident-list-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.incident-list-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.incident-list-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.incident-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* =========================================================
+   PANEL FLOTANTE DE DETALLE
+   ========================================================= */
+
+.incident-detail-panel {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  width: 340px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 1.25rem;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+  max-height: 430px;
+  overflow-y: auto;
+  z-index: 200;
+  animation: slideIn 0.25s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(420px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.close-btn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: #f1f5f9;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #64748b;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-/* Vista solo mapa */
-.dashboard-content.map {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
-  height: calc(100dvh - 170px);
-  min-height: 0;
-  overflow: hidden;
+
+.close-btn:hover {
+  color: #111827;
+  background-color: #e2e8f0;
 }
 
-.dashboard-content.map .map-section {
-  grid-area: auto;
-  height: 100%;
-  min-height: 560px;
-  max-height: none;
+.incident-detail-panel h3 {
+  margin: 0 2rem 0.8rem 0;
+  font-size: 1.1rem;
+  color: #111827;
+  font-weight: 900;
 }
 
-.dashboard-content.map .map-wrapper {
-  flex: 1;
-  height: 100%;
-  min-height: 0;
+.incident-detail-panel p {
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.incident-description {
+  white-space: pre-line;
+}
+
+.status {
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.status-pendiente {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.status-atendido,
+.status-en-proceso {
+  background-color: #fef3c7;
+  color: #b45309;
+}
+
+.status-cerrado {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.take-case-btn {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 12px;
+  background: #0f2a4a;
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.take-case-btn:hover:not(:disabled) {
+  background: #143b69;
+  transform: translateY(-1px);
+}
+
+.take-case-btn:disabled {
+  background: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.busy-message {
+  margin-top: 0.75rem;
+  color: #dc2626 !important;
+  font-size: 0.8rem !important;
+  font-weight: 700;
 }
 
 .incident-actions {
@@ -820,37 +977,6 @@
   background: #143b69;
 }
 
-.dashboard-toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: end;
-  gap: 0.75rem;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  padding: 0.65rem 0.75rem;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
-}
-
-.clear-filters-btn {
-  height: 38px;
-  align-self: end;
-  padding: 0 1rem;
-  border-radius: 12px;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #0f2a4a;
-  font-size: 0.78rem;
-  font-weight: 800;
-  cursor: pointer;
-  transition: 0.2s ease;
-  white-space: nowrap;
-}
-
-.clear-filters-btn:hover {
-  background: #f1f5f9;
-}
-
 .incident-action-btn.danger {
   border: none;
   background: #dc2626;
@@ -860,23 +986,47 @@
 .incident-action-btn.danger:hover {
   background: #b91c1c;
 }
+
+/* =========================================================
+   ADMIN USUARIOS
+   ========================================================= */
+
+.admin-users-section {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .admin-users-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   padding: 1rem;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
 .admin-summary-grid {
+  flex: none;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
 }
 
 .admin-summary-card {
+  height: 110px;
   border: 1px solid #e5e7eb;
   border-radius: 18px;
   background: #f8fafc;
   padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .admin-summary-card span {
@@ -896,6 +1046,7 @@
 }
 
 .admin-users-toolbar {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -927,7 +1078,11 @@
 }
 
 .admin-table-wrapper {
-  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overflow-x: auto;
   border: 1px solid #e5e7eb;
   border-radius: 16px;
 }
@@ -940,6 +1095,9 @@
 }
 
 .admin-users-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   text-align: left;
   padding: 0.85rem;
   background: #f8fafc;
@@ -992,24 +1150,59 @@
   background: #f8fafc;
 }
 
+/* =========================================================
+   ADMIN ZONAS
+   ========================================================= */
+
+.admin-zones-section {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .admin-zones-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 1rem;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
 .admin-zones-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-content: start;
   gap: 1rem;
+  padding-right: 0.4rem;
 }
 
 .admin-zone-card {
+  min-height: 210px;
+  height: auto;
   border: 1px solid #e5e7eb;
   border-radius: 18px;
   background: #ffffff;
   padding: 1rem;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+.admin-zone-card-clickable {
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.admin-zone-card-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
 }
 
 .admin-zone-header {
@@ -1055,359 +1248,6 @@
   color: #334155;
 }
 
-.admin-stats-section {
-  grid-column: 1 / -1;
-  min-height: 0;
-}
-
-.admin-stats-panel {
-  padding: 1rem;
-  display: grid;
-  gap: 1rem;
-}
-
-.admin-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-.admin-stat-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  background: #f8fafc;
-  padding: 1rem;
-}
-
-.admin-stat-card span {
-  display: block;
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: #475569;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.admin-stat-card strong {
-  display: block;
-  margin-top: 0.6rem;
-  font-size: 2rem;
-  font-weight: 900;
-  color: #0f172a;
-}
-
-.admin-stat-card.danger {
-  background: #fff1f2;
-  border-color: #fecdd3;
-}
-
-.admin-stat-card.danger strong {
-  color: #be123c;
-}
-
-.admin-charts-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-.admin-chart-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  background: #ffffff;
-  padding: 1rem;
-}
-
-.admin-chart-card h3 {
-  margin: 0 0 1rem;
-  font-size: 0.95rem;
-  font-weight: 900;
-  color: #0f172a;
-}
-
-.admin-bars {
-  display: grid;
-  gap: 0.85rem;
-}
-
-.admin-bar-row {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.admin-bar-info {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  font-size: 0.82rem;
-  color: #334155;
-}
-
-.admin-bar-info span {
-  font-weight: 700;
-}
-
-.admin-bar-info strong {
-  font-weight: 900;
-  color: #0f172a;
-}
-
-.admin-bar-track {
-  height: 10px;
-  border-radius: 999px;
-  background: #e2e8f0;
-  overflow: hidden;
-}
-
-.admin-bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: #0f2a4a;
-}
-
-.admin-empty-chart {
-  margin: 0;
-  padding: 1rem;
-  border: 1px dashed #cbd5e1;
-  border-radius: 14px;
-  color: #64748b;
-  text-align: center;
-  background: #f8fafc;
-}
-
-@media (max-width: 1100px) {
-  .admin-stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .admin-charts-grid {
-    grid-template-columns: 1fr;
-  }
-}
-.chart-box {
-  width: 100%;
-  height: 260px;
-}
-
-.admin-chart-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  background: #ffffff;
-  padding: 1rem;
-  min-height: 330px;
-}
-
-.admin-chart-card h3 {
-  margin: 0 0 1rem;
-  font-size: 0.95rem;
-  font-weight: 900;
-  color: #0f172a;
-}
-/* Paneles completos para módulos de administrador */
-.admin-users-section,
-.admin-zones-section,
-.admin-stats-section {
-  grid-column: 1 / -1;
-  width: 100%;
-}
-.admin-users-section {
-  grid-column: 1 / -1;
-  width: 100%;
-  height: calc(100dvh - 175px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.admin-users-panel {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 1rem;
-}
-
-.admin-table-wrapper {
-  max-height: 430px;
-  overflow-y: auto;
-  overflow-x: auto;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-}
-
-.admin-users-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: #f8fafc;
-}
-
-/* Panel de usuarios más alto y estable */
-.admin-users-section {
-  grid-column: 1 / -1;
-  width: 100%;
-  height: calc(100dvh - 145px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* Contenido interno con scroll */
-.admin-users-panel {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-/* Evita que las tarjetas superiores se estiren */
-.admin-summary-grid {
-  flex: none;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-.admin-summary-card {
-  min-height: 110px;
-  max-height: 110px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-/* La tabla ocupa el espacio restante */
-.admin-table-wrapper {
-  flex: 1;
-  min-height: 260px;
-  max-height: none;
-  overflow-y: auto;
-  overflow-x: auto;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-}
-
-/* Encabezado fijo de la tabla */
-.admin-users-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: #f8fafc;
-}
-/* Ajustar Gestión de usuarios al alto del panel lateral */
-.admin-users-section {
-  grid-column: 1 / -1;
-  width: 100%;
-  height: calc(100dvh - 20px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* El contenido interno ocupa todo el espacio */
-.admin-users-panel {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-/* Tarjetas superiores fijas, sin estirarse */
-.admin-summary-grid {
-  flex: none;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-.admin-summary-card {
-  height: 110px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-/* Barra de título/filtro fija */
-.admin-users-toolbar {
-  flex: none;
-}
-
-/* La tabla baja hasta el final del panel */
-.admin-table-wrapper {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
-  overflow-y: auto;
-  overflow-x: auto;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-}
-
-/* Encabezado fijo mientras bajas */
-.admin-users-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: #f8fafc;
-}
-/* Ajustar Gestión de zonas al alto del panel lateral */
-.admin-zones-section {
-  grid-column: 1 / -1;
-  width: 100%;
-  height: calc(100dvh - 20px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* Contenido interno de zonas */
-.admin-zones-panel {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-/* Grid de tarjetas de zonas */
-.admin-zones-grid {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  align-content: start;
-  gap: 1rem;
-  padding-right: 0.4rem;
-}
-
-/* Tarjetas de zonas estables */
-.admin-zone-card {
-  min-height: 210px;
-  height: auto;
-}
-
-
-
-
-
-.admin-zone-card-clickable {
-  cursor: pointer;
-  transition: 0.2s ease;
-}
-
-.admin-zone-card-clickable:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
-}
-
 .admin-zone-edit-btn {
   margin-top: 0.75rem;
   border: none;
@@ -1420,22 +1260,175 @@
   cursor: pointer;
 }
 
+.admin-zone-edit-btn.full {
+  width: 100%;
+}
+
+/* =========================================================
+   ADMIN MAPA DE ZONAS / EDITOR DE ZONAS
+   ========================================================= */
+
+.admin-zone-map-section,
 .admin-zone-map-editor {
   grid-column: 1 / -1;
-  height: calc(100dvh - 120px);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: grid-template-columns 0.3s ease;
+}
+
+.admin-zone-map-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.admin-zone-map-box {
+  min-height: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.admin-zone-map-box > div {
+  height: 100% !important;
+}
+
+.admin-zone-map-sidebar {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.admin-zone-map-sidebar-header {
+  flex: none;
+}
+
+.admin-zone-map-sidebar-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.admin-zone-map-sidebar-header p {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.admin-zone-selected-card {
+  flex: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 1rem;
+}
+
+.admin-zone-selected-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.admin-zone-selected-title h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.admin-zone-selected-title p {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.admin-zone-selected-card > p {
+  margin: 0.85rem 0;
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.admin-zone-selected-meta {
+  display: grid;
+  gap: 0.3rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.admin-zone-map-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.5rem;
+  padding-right: 0.35rem;
+}
+
+.admin-zone-map-item {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  cursor: pointer;
+  text-align: left;
+  transition: 0.2s ease;
+}
+
+.admin-zone-map-item:hover {
+  background: #f8fafc;
+}
+
+.admin-zone-map-item.active {
+  border-color: #0f2a4a;
+  background: #eef4ff;
+}
+
+.admin-zone-map-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  flex: none;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+.admin-zone-map-item strong {
+  display: block;
+  font-size: 0.8rem;
+  color: #0f172a;
+}
+
+.admin-zone-map-item small {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: #64748b;
 }
 
 .zone-editor-layout {
+  flex: 1;
+  min-height: 0;
   height: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
   gap: 1rem;
   padding: 1rem;
-  min-height: 0;
 }
 
 .zone-editor-map {
@@ -1443,6 +1436,10 @@
   border-radius: 18px;
   overflow: hidden;
   border: 1px solid #e5e7eb;
+}
+
+.zone-editor-map > div {
+  height: 100% !important;
 }
 
 .zone-editor-panel {
@@ -1517,614 +1514,37 @@
   color: #0f172a;
 }
 
-/* Vista mapa para gestión de zonas */
-.admin-zone-map-section {
+/* =========================================================
+   ADMIN ESTADÍSTICAS
+   ========================================================= */
+
+.admin-stats-section {
   grid-column: 1 / -1;
   width: 100%;
-  height: calc(100dvh - 120px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  min-height: 0;
 }
 
-.admin-zone-map-layout {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 1rem;
+.admin-stats-panel {
   padding: 1rem;
-}
-
-.admin-zone-map-box {
-  min-height: 0;
-  border-radius: 18px;
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
-}
-
-.admin-zone-map-sidebar {
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 1rem;
 }
 
-.admin-zone-map-sidebar-header {
-  flex: none;
-}
-
-.admin-zone-map-sidebar-header h3 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 900;
-  color: #0f172a;
-}
-
-.admin-zone-map-sidebar-header p {
-  margin: 0.25rem 0 0;
-  font-size: 0.8rem;
-  color: #64748b;
-}
-
-.admin-zone-selected-card {
-  flex: none;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  background: #ffffff;
-  padding: 1rem;
-}
-
-.admin-zone-selected-title {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.admin-zone-selected-title h4 {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 900;
-  color: #0f172a;
-}
-
-.admin-zone-selected-title p {
-  margin: 0.2rem 0 0;
-  font-size: 0.78rem;
-  color: #64748b;
-}
-
-.admin-zone-selected-card > p {
-  margin: 0.85rem 0;
-  font-size: 0.82rem;
-  color: #475569;
-  line-height: 1.45;
-}
-
-.admin-zone-selected-meta {
+.admin-stats-grid {
   display: grid;
-  gap: 0.3rem;
-  margin-bottom: 0.85rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #334155;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1rem;
 }
 
-.admin-zone-edit-btn.full {
-  width: 100%;
-}
-
-.admin-zone-map-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: grid;
-  gap: 0.5rem;
-  padding-right: 0.35rem;
-}
-
-.admin-zone-map-item {
-  width: 100%;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  background: #ffffff;
-  padding: 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  cursor: pointer;
-  text-align: left;
-  transition: 0.2s ease;
-}
-
-.admin-zone-map-item:hover {
-  background: #f8fafc;
-}
-
-.admin-zone-map-item.active {
-  border-color: #0f2a4a;
-  background: #eef4ff;
-}
-
-.admin-zone-map-dot {
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  flex: none;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 0 1px #cbd5e1;
-}
-
-.admin-zone-map-item strong {
-  display: block;
-  font-size: 0.8rem;
-  color: #0f172a;
-}
-
-.admin-zone-map-item small {
-  display: block;
-  margin-top: 0.15rem;
-  font-size: 0.72rem;
-  color: #64748b;
-}
-
-@media (max-width: 1000px) {
-  .admin-zone-map-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-zone-map-sidebar {
-    max-height: 420px;
-  }
-}
-
-/* =========================
-   RESPONSIVE SOLO GUARDIA
-   ========================= */
-
-@media (max-width: 768px) {
-  .guard-dashboard .dashboard-main {
-    padding: 0.75rem;
-  }
-
-.guard-dashboard.guard-view .dashboard-layout{
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .guard-dashboard .dashboard-sidebar {
-    width: 100%;
-    min-height: auto;
-    padding: 1rem;
-    border-radius: 20px;
-  }
-
-  .guard-dashboard .sidebar-top {
-    margin-bottom: 0.75rem;
-  }
-
-  .guard-dashboard .sidebar-title {
-    font-size: 1.3rem;
-  }
-
-  .guard-dashboard .sidebar-user {
-    padding: 0.8rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .guard-dashboard .sidebar-menu {
-    display: flex;
-    flex-direction: row;
-    gap: 0.6rem;
-    overflow-x: auto;
-    padding-bottom: 0.25rem;
-  }
-
-  .guard-dashboard .sidebar-item {
-    flex: 0 0 auto;
-    min-width: 135px;
-    padding: 0.8rem 1rem;
-    text-align: center;
-    white-space: nowrap;
-  }
-
-  .guard-dashboard .dashboard-body {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .guard-dashboard .dashboard-toolbar {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    align-items: stretch;
-    padding: 0.75rem;
-  }
-
-  .guard-dashboard .dashboard-search {
-    width: 100%;
-  }
-
-  .guard-dashboard .search-panel {
-    margin-bottom: 0;
-    padding: 0.75rem;
-  }
-
-  .guard-dashboard .search-fields {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-  }
-
-  .guard-dashboard .clear-filters-btn {
-    width: 100%;
-    height: 42px;
-  }
-
-  .guard-dashboard .view-toggle {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .guard-dashboard .toggle-btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .guard-dashboard .dashboard-content {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .guard-dashboard .map-section {
-    width: 100%;
-  }
-
-  .guard-dashboard .map-wrapper {
-    height: 420px;
-    min-height: 420px;
-  }
-
-  .guard-dashboard .bottom-cards {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-  }
-
-  .guard-dashboard .summary-card {
-    min-height: 100px;
-  }
-
-  .guard-dashboard .list-section {
-    width: 100%;
-    max-height: none;
-  }
-
-  .guard-dashboard .incident-list-scroll {
-    max-height: 520px;
-    overflow-y: auto;
-  }
-
-  .guard-dashboard .section-header {
-    padding: 1rem;
-  }
-
-  .guard-dashboard .section-header h2 {
-    font-size: 1rem;
-  }
-
-  .guard-dashboard .section-header p {
-    font-size: 0.78rem;
-  }
-}
-
-
-
-@media (max-width: 480px) {
-  .guard-dashboard .dashboard-main {
-    padding: 0.5rem;
-  }
-
-  .guard-dashboard .dashboard-sidebar {
-    border-radius: 18px;
-  }
-
-  .guard-dashboard .sidebar-user {
-    flex-direction: row;
-    align-items: center;
-  }
-
-  .guard-dashboard .sidebar-avatar {
-    width: 44px;
-    height: 44px;
-    font-size: 1rem;
-  }
-
-  .guard-dashboard .sidebar-user-name {
-    font-size: 0.9rem;
-  }
-
-  .guard-dashboard .sidebar-user-email {
-    font-size: 0.75rem;
-  }
-
-  .guard-dashboard .map-wrapper {
-    height: 360px;
-    min-height: 360px;
-  }
-
-  .guard-dashboard .incident-list-scroll {
-    max-height: 460px;
-  }
-
-  .guard-dashboard .fixed .bg-white {
-    max-width: 95vw;
-  }
-}
-
-/* ==============================
-   RESPONSIVE GUARDIA - CELULAR
-   ============================== */
-
-.mobile-search-toggle {
-  display: none;
-}
-
-@media (max-width: 768px) {
-  .guard-dashboard.guard-view .dashboard-main {
-    padding: 0.75rem;
-  }
-
-  .guard-dashboard.guard-view .dashboard-layout {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .guard-dashboard.guard-view .dashboard-sidebar {
-    width: 100%;
-    min-height: auto;
-    padding: 1rem;
-    border-radius: 20px;
-  }
-
-  .guard-dashboard.guard-view .sidebar-menu {
-    display: flex;
-    flex-direction: row;
-    gap: 0.6rem;
-    overflow-x: auto;
-    padding-bottom: 0.25rem;
-  }
-
-  .guard-dashboard.guard-view .sidebar-item {
-    flex: 0 0 auto;
-    min-width: 135px;
-    text-align: center;
-    white-space: nowrap;
-  }
-
-  .guard-dashboard.guard-view .dashboard-toolbar {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    align-items: stretch;
-    padding: 0.75rem;
-  }
-
-  .guard-dashboard.guard-view .mobile-search-toggle {
-    display: block;
-    width: 100%;
-  }
-
-  .guard-dashboard.guard-view .mobile-search-btn {
-    width: 100%;
-    height: 44px;
-    border: none;
-    border-radius: 14px;
-    background: #0f2a4a;
-    color: white;
-    font-size: 0.9rem;
-    font-weight: 900;
-    cursor: pointer;
-  }
-
-  .guard-dashboard.guard-view .dashboard-search.filters-closed {
-    display: none;
-  }
-
-  .guard-dashboard.guard-view .dashboard-search.filters-open {
-    display: block;
-    width: 100%;
-  }
-
-  .guard-dashboard.guard-view .search-panel {
-    margin-bottom: 0;
-    padding: 1rem;
-  }
-
-  .guard-dashboard.guard-view .search-fields {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.85rem;
-  }
-
-  .guard-dashboard.guard-view .clear-filters-btn {
-    width: 100%;
-    height: 42px;
-  }
-
-  .guard-dashboard.guard-view .view-toggle {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .guard-dashboard.guard-view .toggle-btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .guard-dashboard.guard-view .dashboard-content {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .guard-dashboard.guard-view .map-section {
-    width: 100%;
-    order: 1;
-  }
-
-  .guard-dashboard.guard-view .list-section {
-    width: 100%;
-    order: 2;
-  }
-
-  .guard-dashboard.guard-view .bottom-cards {
-    order: 3;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-  }
-
-  .guard-dashboard.guard-view .map-wrapper {
-    height: 520px;
-    min-height: 520px;
-  }
-
-  .guard-dashboard.guard-view .incident-list-scroll {
-    max-height: 520px;
-    overflow-y: auto;
-  }
-
-  .guard-dashboard.guard-view .summary-card {
-    min-height: 105px;
-  }
-}
-
-@media (max-width: 480px) {
-  .guard-dashboard.guard-view .map-wrapper {
-height: 72vh;
-min-height: 620px;
-  }
-
-  .guard-dashboard.guard-view .incident-list-scroll {
-    max-height: 460px;
-  }
-}
-
-/* Mapa más alto en celular - Guardia */
-@media (max-width: 768px) {
-  .guard-dashboard.guard-view .map-section {
-    min-height: auto;
-  }
-
-  .guard-dashboard.guard-view .map-section .map-wrapper {
-    height: 62vh !important;
-    min-height: 520px !important;
-    max-height: none !important;
-  }
-
-  .guard-dashboard.guard-view .map-section .map-wrapper > div {
-    height: 100% !important;
-  }
-}
-@media (max-width: 480px) {
-  .guard-dashboard.guard-view .map-section .map-wrapper {
-    height: 65vh !important;
-    min-height: 560px !important;
-  }
-}
-
-/* Hacer más largo todo el cuadro del mapa en celular */
-@media (max-width: 768px) {
-  .guard-dashboard.guard-view .map-section {
-    min-height: 680px !important;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .guard-dashboard.guard-view .map-section .section-header {
-    flex: none;
-  }
-
-  .guard-dashboard.guard-view .map-section .map-wrapper {
-    flex: 1;
-    height: auto !important;
-    min-height: 570px !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .guard-dashboard.guard-view .map-section {
-    min-height: 620px !important;
-  }
-
-  .guard-dashboard.guard-view .map-section .map-wrapper {
-    min-height: 610px !important;
-  }
-
-/* ==============================
-   HEADER STICKY EN CELULAR - GUARDIA
-   ============================== */
-
-@media (max-width: 768px) {
-  .guard-dashboard.guard-view > header,
-  .guard-dashboard.guard-view .app-header,
-  .guard-dashboard.guard-view .main-header {
-    position: sticky;
-    top: 0;
-    z-index: 3000;
-  }
-
-  .guard-dashboard.guard-view {
-    overflow: visible;
-  }
-
-  .guard-dashboard.guard-view .dashboard-main {
-    overflow: visible;
-  }
-}
-@media (max-width: 768px) {
-  .guard-dashboard.guard-view > header {
-    min-height: auto;
-  }
-}
-
-/* Quitar header fijo/sticky en celular para guardia */
-@media (max-width: 768px) {
-  .guard-dashboard.guard-view > header,
-  .guard-dashboard.guard-view .app-header,
-  .guard-dashboard.guard-view .main-header {
-    position: static !important;
-    top: auto !important;
-    z-index: auto !important;
-  }
-
-  .guard-dashboard.guard-view {
-    overflow: visible !important;
-  }
-
-  .guard-dashboard.guard-view .dashboard-main {
-    overflow: visible !important;
-  }
-}
-
-.duty-card {
+.admin-stat-card {
   border: 1px solid #e5e7eb;
   border-radius: 18px;
   background: #f8fafc;
   padding: 1rem;
-  display: grid;
-  gap: 0.75rem;
 }
 
-.duty-label {
-  margin: 0;
+.admin-stat-card span {
+  display: block;
   font-size: 0.72rem;
   font-weight: 800;
   color: #475569;
@@ -2132,38 +1552,80 @@ min-height: 620px;
   letter-spacing: 0.08em;
 }
 
-.duty-on {
+.admin-stat-card strong {
   display: block;
-  margin-top: 0.25rem;
-  color: #15803d;
-  font-size: 0.95rem;
-}
-
-.duty-off {
-  display: block;
-  margin-top: 0.25rem;
-  color: #b91c1c;
-  font-size: 0.95rem;
-}
-
-.duty-btn {
-  border: none;
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
-  font-size: 0.82rem;
+  margin-top: 0.6rem;
+  font-size: 2rem;
   font-weight: 900;
-  cursor: pointer;
+  color: #0f172a;
 }
 
-.duty-btn.on {
-  background: #16a34a;
-  color: #ffffff;
+.admin-stat-card.danger {
+  background: #fff1f2;
+  border-color: #fecdd3;
 }
 
-.duty-btn.off {
-  background: #dc2626;
-  color: #ffffff;
+.admin-stat-card.danger strong {
+  color: #be123c;
 }
+
+.admin-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.admin-chart-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 1rem;
+  min-height: 330px;
+}
+
+.admin-chart-card h3 {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.chart-box {
+  width: 100%;
+  height: 260px;
+}
+
+.admin-stats-with-incidents {
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  display: grid;
+  gap: 1rem;
+  padding-right: 0.15rem;
+}
+
+.admin-stats-incidents-section {
+  min-height: 420px;
+}
+
+.admin-stats-incidents-section .incident-list-scroll {
+  max-height: 620px;
+  overflow-y: auto;
+}
+
+.admin-empty-chart {
+  margin: 0;
+  padding: 1rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  color: #64748b;
+  text-align: center;
+  background: #f8fafc;
+}
+
+/* =========================================================
+   SERVICIO / FUERA DE SERVICIO
+   ========================================================= */
 
 .off-duty-panel {
   max-width: 560px;
@@ -2198,7 +1660,6 @@ min-height: 620px;
   cursor: pointer;
 }
 
-/* Estado de servicio desplegable */
 .duty-collapsible {
   padding: 0;
   overflow: hidden;
@@ -2233,4 +1694,907 @@ min-height: 620px;
 
 .duty-arrow.open {
   transform: rotate(180deg);
+}
+
+/* =========================================================
+   CONTROLES MAPA
+   ========================================================= */
+
+.guard-dashboard.guard-view .leaflet-control-layers,
+.guard-dashboard.guard-view .leaflet-control-layers-toggle,
+.guard-dashboard.guard-view .leaflet-control-layers-expanded {
+  font-size: 0.68rem;
+}
+
+.guard-dashboard.guard-view .leaflet-control-layers-expanded {
+  padding: 0.3rem 0.45rem;
+  border-radius: 10px;
+}
+
+.guard-dashboard.guard-view .leaflet-control-layers-base label {
+  margin-bottom: 0.18rem;
+  line-height: 1.1;
+}
+
+.guard-dashboard.guard-view .leaflet-control-layers-base input {
+  width: 0.72rem;
+  height: 0.72rem;
+  margin-right: 0.25rem;
+}
+
+.guard-dashboard.guard-view .leaflet-control-layers-toggle {
+  width: 28px;
+  height: 28px;
+  background-size: 15px 15px;
+}
+
+/* =========================================================
+   RESPONSIVE ADMIN / GUARDIA
+   ========================================================= */
+
+@media (max-width: 1100px) {
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-zone-map-layout,
+  .zone-editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-zone-map-sidebar {
+    max-height: 420px;
+  }
+}
+
+@media (max-width: 900px) {
+  .guard-dashboard {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .guard-dashboard.admin-view .dashboard-main.admin-main,
+  .guard-dashboard.admin-view .dashboard-main.admin-main.sidebar-collapsed,
+  .guard-dashboard.guard-view .dashboard-main.guard-main {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .guard-dashboard.admin-view .lateral-panel.admin-sidebar,
+  .guard-dashboard.admin-view .lateral-panel.admin-sidebar.collapsed,
+  .guard-dashboard.guard-view .lateral-panel.guard-sidebar {
+    width: 100%;
+    height: auto;
+    min-height: auto;
+    align-items: stretch;
+    overflow: visible;
+    border-radius: 20px;
+  }
+
+  .guard-dashboard.admin-view .admin-sidebar.collapsed .sidebar-collapse-btn {
+    width: 100%;
+  }
+
+  .guard-dashboard.admin-view .admin-sidebar.collapsed .sidebar-item {
+    width: auto;
+    min-width: 120px;
+    padding: 0.75rem 0.85rem;
+  }
+
+  .guard-dashboard.admin-view .admin-sidebar.collapsed .sidebar-item-text {
+    max-width: none;
+    font-size: 0.78rem;
+  }
+
+  .guard-dashboard.admin-view .sidebar-menu,
+  .guard-dashboard.guard-view .sidebar-menu {
+    display: flex;
+    flex-direction: row;
+    gap: 0.6rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.2rem;
+  }
+
+  .guard-dashboard.admin-view .sidebar-item,
+  .guard-dashboard.guard-view .sidebar-item {
+    flex: 0 0 auto;
+    min-width: 140px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .guard-dashboard.admin-view .dashboard-body,
+  .guard-dashboard.guard-view .dashboard-body,
+  .guard-dashboard.admin-view .dashboard-content,
+  .guard-dashboard.guard-view .dashboard-content {
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .guard-dashboard.admin-view .map-section,
+  .guard-dashboard.guard-view .map-section {
+    height: auto;
+    min-height: 620px;
+  }
+
+  .guard-dashboard.admin-view .map-wrapper.guard-map-wrapper,
+  .guard-dashboard.guard-view .map-wrapper.guard-map-wrapper {
+    height: 560px;
+    min-height: 560px;
+    flex: none;
+  }
+
+  .admin-map-incident-list {
+    top: 4.75rem;
+    right: 0.55rem;
+    width: min(132px, 38vw);
+    max-height: min(32%, 180px);
+  }
+
+  .dashboard-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+    padding: 0.75rem;
+  }
+
+  .view-toggle {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .toggle-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .clear-filters-btn {
+    width: 100%;
+    height: 42px;
+  }
+
+  .admin-summary-grid,
+  .dashboard-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-users-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .guard-dashboard.guard-view .dashboard-toolbar {
+    display: none;
+  }
+
+  .mobile-search-toggle {
+    display: none;
+  }
+
+  .guard-dashboard.guard-view .mobile-search-toggle {
+    display: block;
+    width: 100%;
+  }
+
+  .guard-dashboard.guard-view .mobile-search-btn {
+    width: 100%;
+    height: 44px;
+    border: none;
+    border-radius: 14px;
+    background: #0f2a4a;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  .guard-dashboard.guard-view .dashboard-search.filters-closed {
+    display: none;
+  }
+
+  .guard-dashboard.guard-view .dashboard-search.filters-open {
+    display: block;
+    width: 100%;
+  }
+
+  .guard-map-header {
+    gap: 0.55rem;
+  }
+
+  .guard-map-header h2 {
+    font-size: 1rem;
+    line-height: 1.1;
+  }
+
+  .guard-map-header p {
+    font-size: 0.72rem;
+    line-height: 1.15;
+  }
+
+  .guard-map-header .zone-legend-inline > button {
+    padding: 0.42rem 0.62rem;
+    font-size: 0.62rem;
+  }
+
+  .zone-legend-inline > div {
+    position: fixed;
+    left: 0.75rem;
+    right: 0.75rem;
+    top: 5rem;
+    width: auto;
+    max-height: calc(100dvh - 6rem);
+    overflow-y: auto;
+  }
+
+  .guard-map-incident-list {
+    top: 4.85rem;
+    right: 0.42rem;
+    width: min(96px, 30vw);
+    max-height: min(28%, 145px);
+    padding: 0.24rem;
+    border-radius: 9px;
+  }
+
+  .guard-map-incident-item {
+    padding: 0.24rem 0.26rem;
+  }
+
+  .guard-map-incident-item span {
+    font-size: 0.56rem;
+  }
+
+  .guard-map-list-header span {
+    font-size: 0.45rem;
+  }
+
+  .guard-map-incident-dot {
+    width: 0.32rem;
+    height: 0.32rem;
+  }
+
+  .incident-detail-panel {
+    width: auto;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    max-height: 55vh;
+    border-radius: 16px;
+  }
+
+  .admin-zone-map-layout,
+  .zone-editor-layout {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .guard-dashboard.admin-view .admin-sidebar-top {
+    display: none;
+  }
+
+  .guard-dashboard.admin-view .sidebar-item,
+  .guard-dashboard.guard-view .sidebar-item {
+    min-width: 132px;
+    padding: 0.8rem 0.85rem;
+    font-size: 0.78rem;
+  }
+
+  .admin-map-incident-list {
+    top: 4.6rem;
+    right: 0.45rem;
+    width: min(118px, 42vw);
+    max-height: min(30%, 160px);
+    padding: 0.26rem;
+  }
+
+  .admin-map-incident-list .guard-map-incident-item span {
+    font-size: 0.54rem;
+  }
+
+  .admin-summary-grid,
+  .dashboard-cards,
+  .admin-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-summary-card {
+    height: auto;
+    min-height: 96px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-main {
+    padding: 0.5rem;
+  }
+
+  .guard-dashboard.admin-view .dashboard-main.admin-main {
+    padding: 0.45rem;
+  }
+
+  .guard-dashboard.admin-view .map-section,
+  .guard-dashboard.guard-view .map-section {
+    min-height: 600px;
+  }
+
+  .guard-dashboard.admin-view .map-wrapper.guard-map-wrapper,
+  .guard-dashboard.guard-view .map-wrapper.guard-map-wrapper {
+    height: 540px;
+    min-height: 540px;
+  }
+
+  .compact-header {
+    padding: 0.65rem 0.75rem;
+  }
+
+  .section-header h2 {
+    font-size: 0.95rem;
+  }
+
+  .section-header p {
+    font-size: 0.72rem;
+  }
+
+  .incident-detail-panel {
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    padding: 1rem;
+  }
+}
+/* ADMIN - fuente más grande en tabla de incidentes dentro del mapa */
+.guard-dashboard.admin-view .admin-map-incident-list .guard-map-list-header span {
+  font-size: 16px;
+}
+
+.guard-dashboard.admin-view .admin-map-incident-list .guard-map-list-header strong {
+  min-width: 28px;
+  height: 28px;
+  font-size: 16px;
+}
+
+.guard-dashboard.admin-view .admin-map-incident-list .guard-map-incident-item span {
+  font-size: 20px;
+  line-height: 1.15;
+  max-width: 280px;
+}
+
+.guard-dashboard.admin-view .admin-map-incident-list .guard-map-incident-dot {
+  width: 12px;
+  height: 12px;
+}
+
+.guard-dashboard.admin-view .admin-map-incident-list .guard-map-incident-title {
+  gap: 10px;
+}
+/* ADMIN - toolbar limpio sin botón Buscar filtros ni selector de vista */
+.guard-dashboard.admin-view .mobile-search-toggle,
+.guard-dashboard.admin-view .view-toggle {
+  display: none !important;
+}
+
+.guard-dashboard.admin-view .admin-filter-toolbar {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.guard-dashboard.admin-view .dashboard-search.filters-open,
+.guard-dashboard.admin-view .dashboard-search.filters-closed {
+  display: block;
+  width: 100%;
+}
+/* =========================================================
+   ADMIN - HISTORIAL GENERAL CON MAPA + LISTA
+   ========================================================= */
+
+.guard-dashboard.admin-view .admin-history-layout {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(420px, 0.75fr);
+  gap: 0.65rem;
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .admin-history-map-section {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .admin-history-map-section .section-header {
+  flex: none;
+}
+
+.guard-dashboard.admin-view .admin-history-map-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .admin-history-map-wrapper > div:first-child {
+  height: 100% !important;
+  min-height: 100% !important;
+}
+
+.guard-dashboard.admin-view .admin-history-list-section {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .admin-history-list-section .incident-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* En historial general el contenido ya no debe forzar area 'map' */
+.guard-dashboard.admin-view .dashboard-content:has(.admin-history-layout) {
+  grid-template-areas: none;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .guard-dashboard.admin-view .admin-history-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .guard-dashboard.admin-view .admin-history-map-section {
+    min-height: 520px;
+  }
+
+  .guard-dashboard.admin-view .admin-history-map-wrapper {
+    height: 460px;
+    min-height: 460px;
+    flex: none;
+  }
+
+  .guard-dashboard.admin-view .admin-history-list-section {
+    min-height: 520px;
+  }
+}
+/* =========================================================
+   ADMIN - HISTORIAL GENERAL CON MAPA VISIBLE
+   ========================================================= */
+
+.guard-dashboard.admin-view .dashboard-content.admin-history-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .admin-history-layout {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(420px, 0.75fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0.65rem;
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .admin-history-map-section,
+.guard-dashboard.admin-view .admin-history-list-section {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .admin-history-map-section .section-header,
+.guard-dashboard.admin-view .admin-history-list-section .section-header {
+  flex: none;
+}
+
+.guard-dashboard.admin-view .admin-history-map-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: 420px;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 0 0 18px 18px;
+}
+
+.guard-dashboard.admin-view .admin-history-map-wrapper > div:first-child {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+}
+
+.guard-dashboard.admin-view .admin-history-list-section .incident-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+@media (max-width: 1100px) {
+  .guard-dashboard.admin-view .dashboard-content.admin-history-content {
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .guard-dashboard.admin-view .admin-history-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .guard-dashboard.admin-view .admin-history-map-section {
+    min-height: 560px;
+  }
+
+  .guard-dashboard.admin-view .admin-history-map-wrapper {
+    height: 500px;
+    min-height: 500px;
+    flex: none;
+  }
+
+  .guard-dashboard.admin-view .admin-history-list-section {
+    min-height: 520px;
+  }
+}
+/* =========================================================
+   FIX ADMIN - HISTORIAL GENERAL MAPA VISIBLE
+   ========================================================= */
+
+.guard-dashboard.admin-view .dashboard-content.admin-history-content {
+  display: block !important;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .admin-history-layout {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(420px, 0.75fr);
+  gap: 0.65rem;
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .admin-history-map-section {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex !important;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .admin-history-map-section .section-header {
+  display: flex !important;
+  flex: none;
+  min-height: 58px;
+  visibility: visible;
+  opacity: 1;
+}
+
+.guard-dashboard.admin-view .admin-history-map-wrapper {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 420px;
+  height: 100%;
+  overflow: hidden;
+  background: #e5e7eb;
+}
+
+.guard-dashboard.admin-view .admin-history-map-wrapper > div {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 420px !important;
+}
+
+.guard-dashboard.admin-view .admin-history-list-section {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex !important;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .admin-history-list-section .incident-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+@media (max-width: 1100px) {
+  .guard-dashboard.admin-view .dashboard-content.admin-history-content {
+    height: auto;
+    overflow: visible;
+  }
+
+  .guard-dashboard.admin-view .admin-history-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
+  }
+
+  .guard-dashboard.admin-view .admin-history-map-section {
+    min-height: 560px;
+  }
+
+  .guard-dashboard.admin-view .admin-history-map-wrapper {
+    height: 500px;
+    min-height: 500px;
+    flex: none;
+  }
+
+  .guard-dashboard.admin-view .admin-history-map-wrapper > div {
+    min-height: 500px !important;
+  }
+
+  .guard-dashboard.admin-view .admin-history-list-section {
+    min-height: 520px;
+  }
+}
+
+/* =========================================================
+   FIX DEFINITIVO - HISTORIAL GENERAL EN COLUMNAS
+   ========================================================= */
+
+.guard-dashboard.admin-view .admin-history-content {
+  flex: 1 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  display: block !important;
+  overflow: hidden !important;
+}
+
+.guard-dashboard.admin-view .admin-history-layout {
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(520px, 0.65fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  grid-template-areas: "history-map history-list" !important;
+
+  gap: 0.75rem !important;
+  align-items: stretch !important;
+  overflow: hidden !important;
+}
+
+/* Tarjeta del mapa a la izquierda */
+.guard-dashboard.admin-view .admin-history-map-section {
+  grid-area: history-map !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* Tarjeta de incidentes a la derecha */
+.guard-dashboard.admin-view .admin-history-list-section {
+  grid-area: history-list !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* Header fijo del mapa */
+.guard-dashboard.admin-view .admin-history-map-section .section-header {
+  flex: 0 0 auto !important;
+}
+
+/* Área real del mapa */
+.guard-dashboard.admin-view .admin-history-map-wrapper {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  position: relative !important;
+  overflow: hidden !important;
+  background: #e5e7eb !important;
+}
+
+/* Forzar el mapa interno */
+.guard-dashboard.admin-view .admin-history-map-wrapper > div,
+.guard-dashboard.admin-view .admin-history-map-wrapper > div > div {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+}
+
+/* Scroll solo en la lista */
+.guard-dashboard.admin-view .admin-history-list-section .incident-list-scroll {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Responsive: en pantallas pequeñas sí se apilan */
+@media (max-width: 1100px) {
+  .guard-dashboard.admin-view .admin-history-content {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .guard-dashboard.admin-view .admin-history-layout {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto !important;
+    grid-template-areas:
+      "history-map"
+      "history-list" !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .guard-dashboard.admin-view .admin-history-map-section {
+    min-height: 560px !important;
+  }
+
+  .guard-dashboard.admin-view .admin-history-map-wrapper {
+    height: 500px !important;
+    min-height: 500px !important;
+    flex: none !important;
+  }
+
+  .guard-dashboard.admin-view .admin-history-list-section {
+    min-height: 520px !important;
+  }
+}
+/* =========================================================
+   FIX ADMIN - ESTADÍSTICAS SIN LISTA DE INCIDENTES
+   ========================================================= */
+
+/* Contenedor de la pestaña Estadísticas */
+.guard-dashboard.admin-view .admin-stats-content {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* El panel de estadísticas ocupa todo el espacio disponible */
+.guard-dashboard.admin-view .admin-stats-content .admin-stats-section {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header fijo arriba */
+.guard-dashboard.admin-view .admin-stats-content .admin-stats-section > .section-header {
+  flex: 0 0 auto;
+}
+
+/* Scroll interno solo dentro del contenido de estadísticas */
+.guard-dashboard.admin-view .admin-stats-content .admin-stats-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem;
+}
+
+/* Las tarjetas superiores se mantienen arriba y no aplastan todo */
+.guard-dashboard.admin-view .admin-stats-content .admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(160px, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+/* Los gráficos ocupan el ancho completo debajo */
+.guard-dashboard.admin-view .admin-stats-content .admin-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+/* Cada gráfico mantiene buen tamaño */
+.guard-dashboard.admin-view .admin-stats-content .admin-chart-card {
+  min-height: 360px;
+}
+
+/* Evita que sobreviva visualmente el bloque viejo si aún existe en el DOM */
+.guard-dashboard.admin-view .admin-stats-with-incidents {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.guard-dashboard.admin-view .admin-stats-incidents-section {
+  display: none !important;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .guard-dashboard.admin-view .admin-stats-content .admin-stats-grid {
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+  }
+
+  .guard-dashboard.admin-view .admin-stats-content .admin-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .guard-dashboard.admin-view .admin-stats-content {
+    height: auto;
+    overflow: visible;
+  }
+
+  .guard-dashboard.admin-view .admin-stats-content .admin-stats-section {
+    height: auto;
+    overflow: visible;
+  }
+
+  .guard-dashboard.admin-view .admin-stats-content .admin-stats-panel {
+    overflow: visible;
+  }
+
+  .guard-dashboard.admin-view .admin-stats-content .admin-stats-grid {
+    grid-template-columns: 1fr;
+  }
 }

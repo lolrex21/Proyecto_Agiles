@@ -190,44 +190,63 @@ export const subscribeToNotificationChannels = (
   userId: number,
   callback: () => void
 ): { unsubscribe: () => Promise<void> } => {
-  const channel = supabase.channel(`notifications-${userId}`)
+  const channelName = `notifications-${userId}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}`
 
-  channel.on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'notificaciones',
-      filter: `usuario_id=eq.${userId}`,
-    },
-    () => callback()
-  )
+  const channel = supabase.channel(channelName)
 
-  channel.on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'notificaciones_grupo',
-    },
-    () => callback()
-  )
+  let isActive = true
 
-  channel.on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'solicitudes_grupo',
-      filter: `usuario_invitado_id=eq.${userId}`,
-    },
-    () => callback()
-  )
+  const safeCallback = () => {
+    if (isActive) {
+      callback()
+    }
+  }
 
-  void channel.subscribe()
+  channel
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'notificaciones',
+        filter: `usuario_id=eq.${userId}`,
+      },
+      safeCallback
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'notificaciones_grupo',
+      },
+      safeCallback
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'solicitudes_grupo',
+        filter: `usuario_invitado_id=eq.${userId}`,
+      },
+      safeCallback
+    )
+    .subscribe((status) => {
+      if (status === 'CHANNEL_ERROR') {
+        console.error('[NOTIFICATIONS] Error al suscribirse al canal realtime')
+      }
+
+      if (status === 'TIMED_OUT') {
+        console.warn('[NOTIFICATIONS] Timeout al suscribirse al canal realtime')
+      }
+    })
 
   return {
     unsubscribe: async () => {
+      isActive = false
       await supabase.removeChannel(channel)
     },
   }

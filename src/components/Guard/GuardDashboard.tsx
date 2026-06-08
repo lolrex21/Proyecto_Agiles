@@ -1,28 +1,30 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import Header from '../Header'
 import SearchBar from '../SearchBar'
 import IncidentMap from '../Map/IncidentMap'
 import IncidentList from '../IncidentList'
 import Toast from '../Toast'
 import AssignedGuardsList from './AssignedGuardsList'
 import ConfirmAttendanceButton from './ConfirmAttendanceButton'
-import NotificationBell from '../NotificationBell'
 import { useIncidents } from '../../hooks/useIncidents'
 import { useEmergencySocket } from '../../hooks/useEmergencySocket'
 import { useAudioAlert } from '../../hooks/useAudioAlert'
 import { useIncidentGuards } from '../../hooks/useIncidentGuards'
 import { emergencySocket } from '../../services/emergencySocket'
+import { getFilteredIncidents } from '../../services/incidentService'
 import { supabase } from '../../services/supabaseClient'
-import { getCurrentUser, logout } from '../../services/authService'
+import { getCurrentUser } from '../../services/authService'
 import './GuardDashboard.css'
 import { usePolygons } from '../../hooks/usePolygons'
 import ZoneLegend from '../Map/ZoneLegend'
 import AdminUsersPanel from '../Admin/AdminUsersPanel'
-import AdminZonesPanel from '../Admin/AdminZonesPanel'  
+import AdminZonesPanel from '../Admin/AdminZonesPanel'
 import AdminStatsPanel from '../Admin/AdminStatsPanel'
 import ZoneEditorMap from '../Admin/ZoneEditorMap'
 import AdminZoneMapPanel from '../Admin/AdminZoneMapPanel'
 
 type IncidentStatus = 'Pendiente' | 'Atendido' | 'Cerrado'
+type DashboardViewMode = 'split' | 'map'
 
 type IncidentFilters = {
   text: string
@@ -39,6 +41,17 @@ type GuardDashboardProps = {
   role?: string
 }
 
+const emptyFilters: IncidentFilters = {
+  text: '',
+  dateFrom: '',
+  dateTo: '',
+  timeFrom: '',
+  timeTo: '',
+  zone: '',
+  estado: '',
+  tipo: '',
+}
+
 export default function GuardDashboard({ role }: GuardDashboardProps) {
   const {
     incidents,
@@ -49,10 +62,6 @@ export default function GuardDashboard({ role }: GuardDashboardProps) {
 
   const user = getCurrentUser()
   const guardId = user?.id ? String(user.id) : ''
-  const userName = user?.nombre || user?.name || 'Usuario'
-  const userEmail = user?.email || user?.correo || 'Correo no disponible'
-  const userRole = user?.rol || user?.role || user?.tipo_usuario || 'estudiante'
-  const isGuard = userRole === 'guardia' || userRole === 'guard'
 
   const currentRole =
     role?.toLowerCase() === 'guardia' || role?.toLowerCase() === 'guard'
@@ -63,12 +72,12 @@ export default function GuardDashboard({ role }: GuardDashboardProps) {
   const isAdmin = !isGuard
 
   const menuItems = isGuard
-    ? ['Dashboard', 'Mis asignaciones', 'Historial']
+    ? ['Mapa', 'Mis asignaciones', 'Historial']
     : ['Incidentes', 'Usuarios', 'Zonas', 'Historial general', 'Estadísticas']
 
   const [activeMenu, setActiveMenu] = useState(menuItems[0])
-  const [viewMode, setViewMode] = useState<'split' | 'map' | 'list'>('split')
-  const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [viewMode, setViewMode] = useState<DashboardViewMode>('split')
+  const [adminSidebarCollapsed, setAdminSidebarCollapsed] = useState(false)
   const [focusedMapIncident, setFocusedMapIncident] = useState<any | null>(null)
 
   const [selectedZone, setSelectedZone] = useState<any | null>(null)
@@ -76,56 +85,67 @@ export default function GuardDashboard({ role }: GuardDashboardProps) {
 
   const [isOnDuty, setIsOnDuty] = useState(false)
   const [checkingDuty, setCheckingDuty] = useState(true)
-const [showDutyOptions, setShowDutyOptions] = useState(false)
-  const [filters, setFilters] = useState<IncidentFilters>({
-    text: '',
-    dateFrom: '',
-    dateTo: '',
-    timeFrom: '',
-    timeTo: '',
-    zone: '',
-    estado: '',
-    tipo: '',
-  })
-
-  const handleLogout = async () => {
-    await logout()
-    window.location.replace('/')
-  }
+  const [filters, setFilters] = useState<IncidentFilters>(emptyFilters)
 
   const [activeAlerts, setActiveAlerts] = useState<any[]>([])
   const [currentIncidentId, setCurrentIncidentId] = useState<string | null>(null)
   const [confirmCloseId, setConfirmCloseId] = useState<number | null>(null)
-  const [mapFullscreen, setMapFullscreen] = useState(false)
-  const [listCollapsed, setListCollapsed] = useState(false)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+
+  const { playAlert } = useAudioAlert()
+  const [alertedIncidentIds, setAlertedIncidentIds] = useState<Set<string>>(
+    () => new Set()
+  )
+  const [alertToast, setAlertToast] = useState<{ message: string } | null>(null)
+  const [serverIncidents, setServerIncidents] = useState<any[]>([])
 
   const guardIdNum = user?.id ? Number(user.id) : 0
   const selectedIncidentId = selectedIncident ? Number(selectedIncident.id) : null
-  const { guards: assignedGuards, loading: guardsLoading } = useIncidentGuards(selectedIncidentId)
+  const { guards: assignedGuards, loading: guardsLoading } =
+    useIncidentGuards(selectedIncidentId)
 
   const { zones } = usePolygons()
 
   const clearFilters = () => {
-    setFilters({
-      text: '',
-      dateFrom: '',
-      dateTo: '',
-      timeFrom: '',
-      timeTo: '',
-      zone: '',
-      estado: '',
-      tipo: '',
-    })
+    setFilters(emptyFilters)
+  }
+
+  const getIncidentDotClass = (tipo?: string | null) => {
+    const normalizedType = String(tipo || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+
+    if (
+      normalizedType.includes('robo') ||
+      normalizedType.includes('hurto') ||
+      normalizedType.includes('asalto')
+    ) {
+      return 'type-robo'
+    }
+
+    if (
+      normalizedType.includes('pelea') ||
+      normalizedType.includes('agresion') ||
+      normalizedType.includes('vandalismo') ||
+      normalizedType.includes('violencia') ||
+      normalizedType.includes('disturbio')
+    ) {
+      return 'type-pelea'
+    }
+
+    if (
+      normalizedType.includes('accidente') ||
+      normalizedType.includes('lesion') ||
+      normalizedType.includes('emergencia medica')
+    ) {
+      return 'type-accidente'
+    }
+
+    return 'type-otro'
   }
 
   const loadDutyStatus = useCallback(async () => {
-    if (!isGuard) {
-      setCheckingDuty(false)
-      return
-    }
-
-    if (!guardId) {
+    if (!isGuard || !guardId) {
       setCheckingDuty(false)
       return
     }
@@ -147,7 +167,7 @@ const [showDutyOptions, setShowDutyOptions] = useState(false)
   }, [guardId, isGuard])
 
   useEffect(() => {
-    loadDutyStatus()
+    void loadDutyStatus()
   }, [loadDutyStatus])
 
   const handleToggleDuty = async () => {
@@ -172,16 +192,66 @@ const [showDutyOptions, setShowDutyOptions] = useState(false)
       setSelectedIncident(null)
       setFocusedMapIncident(null)
       setConfirmCloseId(null)
-      setActiveMenu('Dashboard')
+      setActiveMenu('Mapa')
       setViewMode('split')
       setActiveAlerts([])
     }
   }
 
+  const hasServerFilters = useMemo(
+    () =>
+      Boolean(
+        filters.text ||
+          filters.dateFrom ||
+          filters.dateTo ||
+          filters.zone ||
+          filters.estado ||
+          filters.tipo
+      ),
+    [filters]
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (!hasServerFilters) {
+      setServerIncidents([])
+      return
+    }
+
+    const run = async () => {
+      const data = await getFilteredIncidents({
+        fechaDesde: filters.dateFrom,
+        fechaHasta: filters.dateTo,
+        tipo: filters.tipo,
+        zonaId: filters.zone,
+        estado: filters.estado,
+        texto: filters.text,
+      })
+
+      if (!cancelled) setServerIncidents(data)
+    }
+
+    void run()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    hasServerFilters,
+    filters.dateFrom,
+    filters.dateTo,
+    filters.tipo,
+    filters.zone,
+    filters.estado,
+    filters.text,
+  ])
+
   const visibleIncidents = useMemo(() => {
     const map = new Map<string, any>()
+    const baseIncidents = hasServerFilters ? serverIncidents : incidents
 
-    incidents.forEach((incident: any) => {
+    baseIncidents.forEach((incident: any) => {
       map.set(String(incident.id), incident)
     })
 
@@ -193,7 +263,7 @@ const [showDutyOptions, setShowDutyOptions] = useState(false)
     })
 
     return Array.from(map.values())
-  }, [incidents, activeAlerts])
+  }, [incidents, serverIncidents, hasServerFilters, activeAlerts])
 
   const activeIncidents = useMemo(() => {
     return visibleIncidents.filter((inc: any) => inc.estado === 'Pendiente')
@@ -206,65 +276,79 @@ const [showDutyOptions, setShowDutyOptions] = useState(false)
     )
   }, [visibleIncidents, guardId])
 
-const guardHistoryIncidents = useMemo(() => {
-  return visibleIncidents.filter(
-    (inc: any) =>
-      String(inc.guardia_id) === guardId &&
-      inc.estado !== 'Pendiente' &&
-      inc.estado !== 'Atendido'
-  )
-}, [visibleIncidents, guardId])
+  const takenIncident = useMemo(() => {
+    if (!guardId) return null
 
-const menuIncidents = useMemo(() => {
-  if (isGuard) {
-    // GUARDIA - Dashboard: solo casos activos
-    if (activeMenu === 'Dashboard') {
+    if (currentIncidentId) {
+      const byCurrentId = visibleIncidents.find(
+        (inc: any) => String(inc.id) === String(currentIncidentId)
+      )
+
+      if (byCurrentId) return byCurrentId
+    }
+
+    return (
+      visibleIncidents.find(
+        (inc: any) =>
+          String(inc.guardia_id) === guardId && inc.estado === 'Atendido'
+      ) || null
+    )
+  }, [visibleIncidents, guardId, currentIncidentId])
+
+  const guardHistoryIncidents = useMemo(() => {
+    return visibleIncidents.filter(
+      (inc: any) =>
+        String(inc.guardia_id) === guardId &&
+        inc.estado !== 'Pendiente' &&
+        inc.estado !== 'Atendido'
+    )
+  }, [visibleIncidents, guardId])
+
+  const menuIncidents = useMemo(() => {
+    if (isGuard) {
+      if (activeMenu === 'Mapa') {
+        return visibleIncidents.filter(
+          (inc: any) =>
+            inc.estado === 'Pendiente' || inc.estado === 'Atendido'
+        )
+      }
+
+      if (activeMenu === 'Mis asignaciones') {
+        return assignedIncidents
+      }
+
+      if (activeMenu === 'Historial') {
+        return guardHistoryIncidents
+      }
+
       return visibleIncidents.filter(
         (inc: any) =>
           inc.estado === 'Pendiente' || inc.estado === 'Atendido'
       )
     }
 
-    // GUARDIA - Mis asignaciones: solo casos que tomó este guardia y siguen atendiendo
-    if (activeMenu === 'Mis asignaciones') {
-      return assignedIncidents
+    if (activeMenu === 'Incidentes') {
+      return visibleIncidents.filter(
+        (inc: any) =>
+          inc.estado === 'Pendiente' || inc.estado === 'Atendido'
+      )
     }
 
-    // GUARDIA - Historial: casos que ya atendió este guardia
-    if (activeMenu === 'Historial') {
-      return guardHistoryIncidents
+    if (activeMenu === 'Historial general') {
+      return visibleIncidents.filter(
+        (inc: any) =>
+          inc.estado !== 'Pendiente' && inc.estado !== 'Atendido'
+      )
     }
 
-    return visibleIncidents.filter(
-      (inc: any) =>
-        inc.estado === 'Pendiente' || inc.estado === 'Atendido'
-    )
-  }
-
-  // ADMIN - Incidentes: solo pendientes y atendiendo
-  if (activeMenu === 'Incidentes') {
-    return visibleIncidents.filter(
-      (inc: any) =>
-        inc.estado === 'Pendiente' || inc.estado === 'Atendido'
-    )
-  }
-
-  // ADMIN - Historial general: cerrados, cancelados o finalizados
-  if (activeMenu === 'Historial general') {
-    return visibleIncidents.filter(
-      (inc: any) =>
-        inc.estado !== 'Pendiente' && inc.estado !== 'Atendido'
-    )
-  }
-
-  return visibleIncidents
-}, [
-  isGuard,
-  activeMenu,
-  assignedIncidents,
-  guardHistoryIncidents,
-  visibleIncidents,
-])
+    return visibleIncidents
+  }, [
+    isGuard,
+    activeMenu,
+    assignedIncidents,
+    guardHistoryIncidents,
+    visibleIncidents,
+  ])
 
   const filteredIncidents = useMemo(() => {
     return menuIncidents.filter((incident: any) => {
@@ -305,21 +389,10 @@ const menuIncidents = useMemo(() => {
           '0'
         )}:${String(incidentDate.getMinutes()).padStart(2, '0')}`
 
-        if (filters.dateFrom && incidentDateOnly < filters.dateFrom) {
-          return false
-        }
-
-        if (filters.dateTo && incidentDateOnly > filters.dateTo) {
-          return false
-        }
-
-        if (filters.timeFrom && incidentTimeOnly < filters.timeFrom) {
-          return false
-        }
-
-        if (filters.timeTo && incidentTimeOnly > filters.timeTo) {
-          return false
-        }
+        if (filters.dateFrom && incidentDateOnly < filters.dateFrom) return false
+        if (filters.dateTo && incidentDateOnly > filters.dateTo) return false
+        if (filters.timeFrom && incidentTimeOnly < filters.timeFrom) return false
+        if (filters.timeTo && incidentTimeOnly > filters.timeTo) return false
       }
 
       if (filters.zone && Number(incident.zona_id) !== Number(filters.zone)) {
@@ -344,69 +417,41 @@ const menuIncidents = useMemo(() => {
   const mapIncidents = filteredIncidents
   const listIncidents = filteredIncidents
 
-  const totalIncidents = visibleIncidents.length
-
-  const attendedCount = visibleIncidents.filter(
-    (inc: any) => inc.estado === 'Atendido'
-  ).length
-
-  const pendingCount = visibleIncidents.filter(
-    (inc: any) => inc.estado === 'Pendiente'
-  ).length
-
-  const emergenciesCount = visibleIncidents.filter((inc: any) => {
-    const tipo = inc.tipo_incidente?.toLowerCase() || ''
-
-    return (
-      inc.estado === 'Pendiente' ||
-      tipo.includes('incendio') ||
-      tipo.includes('accidente') ||
-      tipo.includes('agresion') ||
-      tipo.includes('agresión')
-    )
-  }).length
-
   const listSectionTitle = isGuard
     ? activeMenu === 'Mis asignaciones'
-      ? 'Mis incidentes asignados'
+      ? 'Mi asignación activa'
       : activeMenu === 'Historial'
-      ? 'Mi historial de incidentes'
+      ? 'Historial de incidentes'
       : 'Alertas pendientes'
-    : activeMenu === 'Incidentes'
-    ? 'Gestión de incidentes'
     : activeMenu === 'Historial general'
     ? 'Historial general'
     : 'Alertas pendientes'
 
   const listSectionSubtitle = isGuard
     ? activeMenu === 'Mis asignaciones'
-      ? `${filteredIncidents.length} incidente(s) asignado(s)`
+      ? `${filteredIncidents.length} asignación activa`
       : activeMenu === 'Historial'
-      ? `${filteredIncidents.length} incidente(s) atendido(s) por este guardia`
+      ? `${filteredIncidents.length} incidente(s) anteriores`
       : `${filteredIncidents.length} alerta(s) pendiente(s)`
-    : activeMenu === 'Incidentes'
-    ? `${filteredIncidents.length} incidente(s) registrados`
     : activeMenu === 'Historial general'
     ? `${filteredIncidents.length} incidente(s) cerrado(s)`
     : `${filteredIncidents.length} alerta(s) pendiente(s)`
 
-  const mapTitle =
-    activeMenu === 'Mis asignaciones'
-      ? 'Mapa - Mis asignaciones'
-      : activeMenu === 'Historial' || activeMenu === 'Historial general'
-      ? 'Mapa histórico'
-      : activeMenu === 'Incidentes'
-      ? 'Mapa de incidentes'
-      : 'Mapa de incidentes'
-
-  const mapSubtitle =
-    activeMenu === 'Mis asignaciones'
-      ? `${assignedIncidents.length} caso(s) asignado(s)`
+  const mapTitle = isGuard
+    ? activeMenu === 'Mis asignaciones'
+      ? 'Mapa - Asignación activa'
       : activeMenu === 'Historial'
-      ? `${guardHistoryIncidents.length} caso(s) atendido(s) por este guardia`
-      : activeMenu === 'Historial general'
-      ? `${filteredIncidents.length} caso(s) cerrado(s)`
-      : 'Ubicación de las alertas y zonas del campus'
+      ? 'Mapa - Historial'
+      : 'Mapa'
+    : 'Mapa de incidentes'
+
+  const mapSubtitle = isGuard
+    ? activeMenu === 'Mis asignaciones'
+      ? `${assignedIncidents.length} caso(s) activo(s) asignado(s)`
+      : activeMenu === 'Historial'
+      ? `${guardHistoryIncidents.length} incidente(s) anterior(es)`
+      : 'Ubicación de las alertas del campus'
+    : 'Ubicación de las alertas y zonas del campus'
 
   const isManagementSection =
     isAdmin &&
@@ -414,13 +459,15 @@ const menuIncidents = useMemo(() => {
       activeMenu === 'Zonas' ||
       activeMenu === 'Estadísticas')
 
-  const showMapSection =
-    !isManagementSection && activeMenu !== 'Estadísticas' && viewMode !== 'list'
+  const showMainMapSection =
+    !isManagementSection &&
+    (!isGuard ? activeMenu === 'Incidentes' : activeMenu === 'Mapa')
 
-  const showSummaryCards = showMapSection && viewMode === 'split'
-
-  const showListSection =
-    !isManagementSection && activeMenu !== 'Mapa' && viewMode !== 'map'
+  const showGuardListSection =
+    isGuard &&
+    (activeMenu === 'Mapa' ||
+      activeMenu === 'Mis asignaciones' ||
+      activeMenu === 'Historial')
 
   const showListActions = isGuard && isOnDuty && activeMenu !== 'Historial'
 
@@ -456,9 +503,7 @@ const menuIncidents = useMemo(() => {
       .eq('id', incidentId)
       .maybeSingle()
 
-    if (error) {
-      throw new Error(error.message)
-    }
+    if (error) throw new Error(error.message)
 
     return data
   }, [])
@@ -490,12 +535,12 @@ const menuIncidents = useMemo(() => {
 
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
+      void Notification.requestPermission()
     }
   }, [])
 
   useEffect(() => {
-    checkActiveIncidentForGuard()
+    void checkActiveIncidentForGuard()
   }, [checkActiveIncidentForGuard])
 
   const handleTakeIncident = useCallback(
@@ -590,14 +635,11 @@ const menuIncidents = useMemo(() => {
         upsertLocalIncident(updatedIncident)
         setSelectedIncident(updatedIncident)
 
-        // Register Primary Guard in junction table for multi-guard tracking
-        await supabase
-          .from('incidente_guardias')
-          .insert({
-            incidente_id: incidentId,
-            guardia_id: Number(guardId),
-            estado_asistencia: 'confirmado',
-          })
+        await supabase.from('incidente_guardias').insert({
+          incidente_id: incidentId,
+          guardia_id: Number(guardId),
+          estado_asistencia: 'confirmado',
+        })
 
         emergencySocket.takeIncident(incidentIdText, guardId, updatedIncident)
         emergencySocket.updateIncident(incidentIdText, 'Atendido', guardId)
@@ -649,9 +691,7 @@ const menuIncidents = useMemo(() => {
       try {
         const { error: closeError } = await supabase
           .from('incidentes')
-          .update({
-            estado: 'Cerrado',
-          })
+          .update({ estado: 'Cerrado' })
           .eq('id', incidentId)
           .eq('guardia_id', guardId)
           .eq('estado', 'Atendido')
@@ -668,22 +708,12 @@ const menuIncidents = useMemo(() => {
         setCurrentIncidentId(null)
         upsertLocalIncident(closedIncident)
 
-        setActiveMenu('Dashboard')
+        setActiveMenu('Mapa')
         setViewMode('split')
         setFocusedMapIncident(null)
         setSelectedIncident(null)
         setConfirmCloseId(null)
-
-        setFilters({
-          text: '',
-          dateFrom: '',
-          dateTo: '',
-          timeFrom: '',
-          timeTo: '',
-          zone: '',
-          estado: '',
-          tipo: '',
-        })
+        setFilters(emptyFilters)
 
         emergencySocket.closeIncident(
           incidentIdText,
@@ -721,13 +751,8 @@ const menuIncidents = useMemo(() => {
         return false
       }
 
-      if (status === 'Atendido') {
-        return handleTakeIncident(incident)
-      }
-
-      if (status === 'Cerrado') {
-        return handleCloseIncident(incident)
-      }
+      if (status === 'Atendido') return handleTakeIncident(incident)
+      if (status === 'Cerrado') return handleCloseIncident(incident)
 
       return false
     },
@@ -749,32 +774,36 @@ const menuIncidents = useMemo(() => {
         activeAlerts.some((i) => String(i.id) === incidentId) ||
         incidents.some((i: any) => String(i.id) === incidentId)
 
+      const yaAlertado = alertedIncidentIds.has(incidentId)
+
       upsertLocalIncident(cleanIncident)
 
-      if (
-        cleanIncident.estado === 'Pendiente' &&
-        !yaConocido &&
-        'Notification' in window &&
-        Notification.permission === 'granted'
-      ) {
-        new Notification('Nueva emergencia', {
-          body:
-            cleanIncident.descripcion ||
-            'Se ha reportado una nueva emergencia',
+      if (cleanIncident.estado === 'Pendiente' && !yaConocido && !yaAlertado) {
+        setAlertedIncidentIds((prev) => {
+          const next = new Set(prev)
+          next.add(incidentId)
+          return next
         })
-        setAlertedIncidentIds((prev) => new Set(prev).add(incidentId))
+
         playAlert()
 
         const tipo = cleanIncident.tipo_incidente || 'Emergencia'
-        const ubicacion = cleanIncident.ubicacion || 'Ubicación no especificada'
+        const ubicacion =
+          cleanIncident.ubicacion ||
+          cleanIncident.zona?.nombre ||
+          'Ubicación no especificada'
+
         setAlertToast({
           message: `ALERTA DE INCIDENTE — ${tipo} — ${ubicacion}`,
         })
-        setTimeout(() => setAlertToast(null), 5000)
+
+        window.setTimeout(() => setAlertToast(null), 5000)
 
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification('Nueva emergencia', {
-            body: cleanIncident.descripcion || 'Se ha reportado una nueva emergencia',
+            body:
+              cleanIncident.descripcion ||
+              'Se ha reportado una nueva emergencia',
           })
         }
       }
@@ -795,7 +824,7 @@ const menuIncidents = useMemo(() => {
     ({ incidentId, guardId: assignedGuardId, incident }: any) => {
       const normalizedIncidentId = String(incidentId)
 
-            const cleanIncident = sanitizeIncident({
+      const cleanIncident = sanitizeIncident({
         ...incident,
         estado: 'Atendido',
         guardia_id: assignedGuardId,
@@ -851,13 +880,35 @@ const menuIncidents = useMemo(() => {
     onGuardBusy: handleGuardBusy,
   })
 
-  const { zones } = usePolygons()
-
   const handleShowIncidentOnMap = useCallback(
     (incident: any) => {
-      setFocusedMapIncident(incident)
       setSelectedIncident(null)
+      setFocusedMapIncident(incident)
+
+      if (isGuard) {
+        setActiveMenu('Mapa')
+        setViewMode('split')
+        return
+      }
+
+      if (activeMenu === 'Historial general') {
+        return
+      }
+
+      setActiveMenu('Incidentes')
       setViewMode('map')
+    },
+    [isGuard, activeMenu, setSelectedIncident]
+  )
+
+  const handleGuardMapIncidentClick = useCallback(
+    (incident: any) => {
+      setSelectedIncident(null)
+      setFocusedMapIncident(incident)
+
+      window.setTimeout(() => {
+        setSelectedIncident(incident)
+      }, 2200)
     },
     [setSelectedIncident]
   )
@@ -874,10 +925,21 @@ const menuIncidents = useMemo(() => {
     [setSelectedIncident]
   )
 
+  const guardHeaderConfig = isGuard
+    ? {
+        enabled: true,
+        isOnDuty,
+        pendingCount: activeIncidents.length,
+        takenIncident,
+        onToggleDuty: handleToggleDuty,
+        onOpenTakenIncident: (incident: any) => setSelectedIncident(incident),
+      }
+    : undefined
+
   if (isGuard && checkingDuty) {
     return (
       <div className="guard-dashboard guard-view">
-        <Header />
+        <Header guardNotifications={guardHeaderConfig} />
 
         <main className="dashboard-main">
           <div className="off-duty-panel">
@@ -892,7 +954,7 @@ const menuIncidents = useMemo(() => {
   if (isGuard && !isOnDuty) {
     return (
       <div className="guard-dashboard guard-view">
-        <Header />
+        <Header guardNotifications={guardHeaderConfig} />
 
         <main className="dashboard-main">
           <div className="off-duty-panel">
@@ -913,259 +975,63 @@ const menuIncidents = useMemo(() => {
 
   return (
     <div className={`guard-dashboard ${isGuard ? 'guard-view' : 'admin-view'}`}>
-      <Header />
+      <Header guardNotifications={guardHeaderConfig} />
+
+      {alertToast && (
+        <Toast
+          message={alertToast.message}
+          type="info"
+          onClose={() => setAlertToast(null)}
+        />
+      )}
 
       <main
-        className={`dashboard-main${listCollapsed ? ' panel-collapsed' : ''}${
-          viewMode === 'map' ? ' view-map' : ''
-        }${viewMode === 'list' ? ' view-list' : ''}`}
+        className={`dashboard-main ${isAdmin ? 'admin-main' : 'guard-main'} ${
+          adminSidebarCollapsed ? 'sidebar-collapsed' : ''
+        }`}
       >
-        {viewMode !== 'list' && (
-          <section
-            className={`map-section${mapFullscreen ? ' map-fullscreen' : ''}`}
-          >
-            <div className="map-brand-overlay">
-              <div className="map-brand-icon">🛡️</div>
-              <div className="map-brand-text">
-                <span className="map-brand-title">UTA CampusSeguro</span>
-                <span className="map-brand-sub">
-                  Sistema de alertas universitarias
-                </span>
-              </div>
-            </div>
-
-            <div className="map-floating-controls">
-              {viewMode === 'split' && (
-                <button
-                  className={`map-floating-btn${
-                    listCollapsed ? ' active' : ''
-                  }`}
-                  onClick={() => setListCollapsed((v) => !v)}
-                  title={
-                    listCollapsed
-                      ? 'Mostrar panel lateral'
-                      : 'Colapsar panel lateral'
-                  }
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    {listCollapsed ? (
-                      <polyline points="15 18 9 12 15 6" />
-                    ) : (
-                      <polyline points="9 18 15 12 9 6" />
-                    )}
-                  </svg>
-                </button>
-              )}
-
-              <button
-                className={`map-floating-btn${
-                  mapFullscreen ? ' active' : ''
-                }`}
-                onClick={() => setMapFullscreen((v) => !v)}
-                title={
-                  mapFullscreen
-                    ? 'Salir de pantalla completa'
-                    : 'Pantalla completa'
-                }
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  {mapFullscreen ? (
-                    <>
-                      <polyline points="8 3 3 3 3 8" />
-                      <polyline points="21 8 21 3 16 3" />
-                      <polyline points="3 16 3 21 8 21" />
-                      <polyline points="16 21 21 21 21 16" />
-                    </>
-                  ) : (
-                    <>
-                      <polyline points="15 3 21 3 21 9" />
-                      <polyline points="9 21 3 21 3 15" />
-                      <line x1="21" y1="3" x2="14" y2="10" />
-                      <line x1="3" y1="21" x2="10" y2="14" />
-                    </>
-                  )}
-                </svg>
-              </button>
-            </div>
-
-            <div className="map-wrapper">
-              <IncidentMap
-                incidents={visibleIncidents}
-                loading={loading}
-                onMarkerClick={setSelectedIncident}
-                isAdmin={user?.rol === 'administrador'}
-              />
-              <ZoneLegend zones={zones} />
-            </div>
-          </section>
-        )}
-
-        <div
-          className={`drawer-overlay${drawerOpen ? ' visible' : ''}`}
-          onClick={() => setDrawerOpen(false)}
-        />
-
         <aside
-          className={[
-            'lateral-panel',
-            listCollapsed ? 'collapsed' : '',
-            drawerOpen ? 'drawer-open' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
+          className={`lateral-panel ${
+            isAdmin ? 'admin-sidebar' : 'guard-sidebar'
+          } ${adminSidebarCollapsed ? 'collapsed' : ''}`}
         >
-          <div
-            className="panel-user-card"
-            onClick={() => setDrawerOpen((v) => !v)}
-            style={{ cursor: 'pointer' }}
-          >
-            <div className="panel-user-avatar">
-              {(userName || 'U').charAt(0).toUpperCase()}
-            </div>
-
-            <div className="panel-user-info">
-              <span className="panel-user-role">
-                {isGuard ? 'Guardia de seguridad' : 'Estudiante'}
-              </span>
-              <strong className="panel-user-name">
-                {userName || 'Usuario'}
-              </strong>
-              <span className="panel-user-email">
-                {userEmail || 'sin correo'}
-              </span>
-
-              {isGuard && (
-                <span className="panel-user-zone">
-                  Zona: {user?.zona_id || 'Sin asignar'}
-                </span>
-              )}
-            </div>
-
-            <div
-              className="panel-user-actions"
-              onClick={(e) => e.stopPropagation()}
+          {isAdmin && (
+            <button
+              type="button"
+              className="sidebar-collapse-btn"
+              onClick={() => setAdminSidebarCollapsed((prev) => !prev)}
+              title={adminSidebarCollapsed ? 'Expandir menú' : 'Plegar menú'}
             >
-              <NotificationBell />
-              <button onClick={handleLogout} className="panel-logout-btn">
-                Salir
-              </button>
-            </div>
-          </div>
-
-          <div className="panel-header">
-            <div className="panel-top-row">
-              <button
-                className="panel-collapse-btn"
-                onClick={() => setListCollapsed((v) => !v)}
-                title={listCollapsed ? 'Expandir panel' : 'Colapsar panel'}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  {listCollapsed ? (
-                    <polyline points="9 18 15 12 9 6" />
-                  ) : (
-                    <polyline points="15 18 9 12 15 6" />
-                  )}
-                </svg>
-              </button>
-
-              <div className="panel-search">
-                <SearchBar onSearch={handleSearch} />
-              </div>
-            </div>
-          </div>
-
-          {/* Aquí continúa el contenido que ya tengas dentro del panel:
-              lista de incidentes, menús, botones, filtros, etc. */}
-        </aside>
-      </main>
-    </div>
-  )
-              </div>
-            </div>
-
-          {isGuard && (
-            <div className="duty-card duty-collapsible">
-              <button
-                type="button"
-                className="duty-header-btn"
-                onClick={() => setShowDutyOptions((prev) => !prev)}
-              >
-                <div>
-                  <p className="duty-label">Estado de servicio</p>
-                  <strong className={isOnDuty ? 'duty-on' : 'duty-off'}>
-                    {isOnDuty ? 'En servicio' : 'Fuera de servicio'}
-                  </strong>
-                </div>
-
-                <span className={`duty-arrow ${showDutyOptions ? 'open' : ''}`}>
-                  ▾
-                </span>
-              </button>
-
-              {showDutyOptions && (
-                <div className="duty-options">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await handleToggleDuty()
-                      setShowDutyOptions(false)
-                    }}
-                    className={isOnDuty ? 'duty-btn off' : 'duty-btn on'}
-                  >
-                    {isOnDuty ? 'Salir de servicio' : 'Entrar en servicio'}
-                  </button>
-                </div>
-              )}
-            </div>
+              {adminSidebarCollapsed ? '☰' : '←'}
+            </button>
           )}
 
-          <span className="collapsed-label">
-            {activeIncidents.length} alertas
-          </span>
+          {isAdmin && !adminSidebarCollapsed && (
+            <div className="sidebar-top admin-sidebar-top">
+              <p className="sidebar-label">Panel administrativo</p>
+              <h2 className="sidebar-title">Gestión</h2>
+              <p className="sidebar-subtitle">
+                Incidentes, usuarios, zonas, historial y estadísticas.
+              </p>
+            </div>
+          )}
 
           <nav className="sidebar-menu">
             {menuItems.map((item) => (
               <button
                 key={item}
                 type="button"
-                className={`sidebar-item ${
-                  activeMenu === item ? 'active' : ''
-                }`}
+                className={`sidebar-item ${activeMenu === item ? 'active' : ''}`}
                 onClick={() => {
                   setActiveMenu(item)
                   setFocusedMapIncident(null)
                   setSelectedIncident(null)
                   setConfirmCloseId(null)
+
+                  if (isGuard) {
+                    setViewMode('split')
+                    return
+                  }
 
                   if (item !== 'Zonas') {
                     setZoneEditorMode(false)
@@ -1173,235 +1039,279 @@ const menuIncidents = useMemo(() => {
                     setViewMode('split')
                   }
                 }}
+                title={item}
               >
-                {item}
+                <span className="sidebar-item-text">{item}</span>
               </button>
             ))}
           </nav>
         </aside>
 
         <div className="dashboard-body">
-          <section className="dashboard-toolbar">
-            <div className="mobile-search-toggle">
-              <button
-                type="button"
-                onClick={() => setShowMobileFilters((prev) => !prev)}
-                className="mobile-search-btn"
-              >
-                {showMobileFilters ? 'Ocultar filtros' : 'Buscar filtros'}
-              </button>
-            </div>
+          {isAdmin &&
+            (activeMenu === 'Historial general' ||
+              activeMenu === 'Estadísticas') && (
+              <section className="dashboard-toolbar admin-filter-toolbar">
+                <div className="dashboard-search filters-open">
+                  <SearchBar
+                    filters={filters}
+                    zones={zones}
+                    onChange={setFilters}
+                  />
+                </div>
 
-            <div
-              className={`dashboard-search ${
-                showMobileFilters ? 'filters-open' : 'filters-closed'
-              }`}
-            >
-              <SearchBar
-                filters={filters}
-                zones={zones}
-                onChange={setFilters}
-              />
-            </div>
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="clear-filters-btn"
+                >
+                  Limpiar
+                </button>
+              </section>
+            )}
 
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="clear-filters-btn"
-            >
-              Limpiar
-            </button>
-
-            <div className="view-toggle compact">
-              <button
-                type="button"
-                onClick={() => setViewMode('split')}
-                className={`toggle-btn ${
-                  viewMode === 'split' ? 'active' : ''
-                }`}
-                title="Vista dividida"
-              >
-                Dividida
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setViewMode('map')}
-                className={`toggle-btn ${
-                  viewMode === 'map' ? 'active' : ''
-                }`}
-                title="Ver solo mapa"
-              >
-                Mapa
-              </button>
-            </div>
-          </section>
-
-          <section className={`dashboard-content ${viewMode}`}>
-            {isAdmin && activeMenu === 'Usuarios' && <AdminUsersPanel />}
-
-            {isAdmin &&
-              activeMenu === 'Zonas' &&
-              !zoneEditorMode &&
-              viewMode === 'split' && (
-                <AdminZonesPanel onEditZone={handleEditZoneOnMap} />
-              )}
-
-            {isAdmin &&
-              activeMenu === 'Zonas' &&
-              !zoneEditorMode &&
-              viewMode === 'map' && (
-                <AdminZoneMapPanel
-                  zones={zones}
-                  onEditZone={handleEditZoneOnMap}
-                />
-              )}
-
-            {isAdmin &&
-              activeMenu === 'Zonas' &&
-              zoneEditorMode &&
-              selectedZone && (
-                <article className="dashboard-card map-section admin-zone-map-editor">
-                  <div className="section-header compact-header">
+          {isAdmin && activeMenu === 'Historial general' ? (
+            <section className="admin-history-content">
+              <div className="admin-history-layout">
+                <article className="dashboard-card admin-history-map-section">
+                  <div className="section-header compact-header guard-map-header">
                     <div>
-                      <h2>Editar zona: {selectedZone.nombre}</h2>
+                      <h2>Mapa histórico</h2>
                       <p>
-                        Modifica la información visual y territorial de esta
-                        zona.
+                        Ubicación de {listIncidents.length} incidente(s)
+                        mostrado(s) en el historial.
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      className="clear-filters-btn"
-                      onClick={() => {
-                        setZoneEditorMode(false)
-                        setSelectedZone(null)
-                        setViewMode('split')
-                      }}
-                    >
-                      Volver a zonas
-                    </button>
+                    <ZoneLegend
+                      zones={zones}
+                      mode="button"
+                      hideCameras={true}
+                    />
                   </div>
 
-                  <div className="map-wrapper">
-                    <ZoneEditorMap
-                      zone={selectedZone}
+                  <div className="map-wrapper guard-map-wrapper admin-history-map-wrapper">
+                    <IncidentMap
+                      key={`history-map-${listIncidents.length}-${filters.text}-${filters.dateFrom}-${filters.dateTo}-${filters.zone}-${filters.estado}-${filters.tipo}`}
+                      incidents={listIncidents}
+                      loading={loading}
+                      selectedIncident={focusedMapIncident || selectedIncident}
+                      onMarkerClick={(incident) => {
+                        setFocusedMapIncident(incident)
+                        setSelectedIncident(incident)
+                      }}
+                      isAdmin={true}
+                      hideCameraToggle={true}
+                    />
+                  </div>
+                </article>
+
+                <article className="dashboard-card list-section admin-history-list-section">
+                  <div className="section-header compact-header">
+                    <div>
+                      <h2>{listSectionTitle}</h2>
+                      <p>{listSectionSubtitle}</p>
+                    </div>
+                  </div>
+
+                  <div className="incident-list-scroll">
+                    <IncidentList
+                      incidents={listIncidents}
+                      loading={loading}
+                      onSelect={setSelectedIncident}
+                      onMap={(incident) => {
+                        setFocusedMapIncident(incident)
+                        setSelectedIncident(incident)
+                      }}
+                      onStatusUpdate={undefined}
+                      showActions={false}
+                      emptyMessage="No hay incidentes históricos para mostrar."
+                    />
+                  </div>
+                </article>
+              </div>
+            </section>
+          ) : (
+            <section className={`dashboard-content ${viewMode}`}>
+              {isAdmin && activeMenu === 'Usuarios' && <AdminUsersPanel />}
+
+              {isAdmin &&
+                activeMenu === 'Zonas' &&
+                !zoneEditorMode &&
+                viewMode === 'split' && (
+                  <AdminZonesPanel onEditZone={handleEditZoneOnMap} />
+                )}
+
+              {isAdmin &&
+                activeMenu === 'Zonas' &&
+                !zoneEditorMode &&
+                viewMode === 'map' && (
+                  <AdminZoneMapPanel
+                    zones={zones}
+                    onEditZone={handleEditZoneOnMap}
+                  />
+                )}
+
+              {isAdmin &&
+                activeMenu === 'Zonas' &&
+                zoneEditorMode &&
+                selectedZone && (
+                  <article className="dashboard-card map-section admin-zone-map-editor">
+                    <div className="section-header compact-header">
+                      <div>
+                        <h2>Editar zona: {selectedZone.nombre}</h2>
+                        <p>
+                          Modifica la información visual y territorial de esta
+                          zona.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="clear-filters-btn"
+                        onClick={() => {
+                          setZoneEditorMode(false)
+                          setSelectedZone(null)
+                          setViewMode('split')
+                        }}
+                      >
+                        Volver a zonas
+                      </button>
+                    </div>
+
+                    <div className="map-wrapper">
+                      <ZoneEditorMap
+                        zone={selectedZone}
+                        zones={zones}
+                        onZoneUpdated={(updatedZone) => {
+                          setSelectedZone(updatedZone)
+                        }}
+                        onCancel={() => {
+                          setZoneEditorMode(false)
+                          setSelectedZone(null)
+                          setViewMode('split')
+                        }}
+                      />
+                    </div>
+                  </article>
+                )}
+
+              {isAdmin && activeMenu === 'Estadísticas' && (
+                <section className="admin-stats-content">
+                  <AdminStatsPanel incidents={filteredIncidents} />
+                </section>
+              )}
+
+              {showMainMapSection && (
+                <article className="dashboard-card map-section">
+                  <div className="section-header compact-header guard-map-header">
+                    <div>
+                      <h2>{mapTitle}</h2>
+                      <p>{mapSubtitle}</p>
+                    </div>
+
+                    <ZoneLegend
                       zones={zones}
-                      onZoneUpdated={(updatedZone) => {
-                        setSelectedZone(updatedZone)
+                      mode="button"
+                      hideCameras={isGuard}
+                    />
+                  </div>
+
+                  <div className="map-wrapper guard-map-wrapper">
+                    <IncidentMap
+                      incidents={mapIncidents}
+                      loading={loading}
+                      selectedIncident={focusedMapIncident || selectedIncident}
+                      onMarkerClick={(incident) => {
+                        setFocusedMapIncident(incident)
+                        setSelectedIncident(incident)
                       }}
-                      onCancel={() => {
-                        setZoneEditorMode(false)
-                        setSelectedZone(null)
-                        setViewMode('split')
-                      }}
+                      isAdmin={isAdmin}
+                      hideCameraToggle={isGuard}
+                    />
+
+                    {(isGuard || isAdmin) && mapIncidents.length > 0 && (
+                      <div
+                        className={
+                          isAdmin
+                            ? 'admin-map-incident-list'
+                            : 'guard-map-incident-list'
+                        }
+                      >
+                        <div className="guard-map-list-header">
+                          <span>Incidentes</span>
+                          <strong>{mapIncidents.length}</strong>
+                        </div>
+
+                        <div className="guard-map-list-scroll">
+                          {mapIncidents.map((incident: any) => (
+                            <button
+                              key={incident.id}
+                              type="button"
+                              className="guard-map-incident-item"
+                              onClick={() => {
+                                if (isGuard) {
+                                  handleGuardMapIncidentClick(incident)
+                                  return
+                                }
+
+                                setFocusedMapIncident(incident)
+                                setSelectedIncident(incident)
+                              }}
+                              title={incident.tipo_incidente || 'Incidente'}
+                            >
+                              <div className="guard-map-incident-title">
+                                <i
+                                  className={`guard-map-incident-dot ${getIncidentDotClass(
+                                    incident.tipo_incidente
+                                  )}`}
+                                />
+                                <span>
+                                  {incident.tipo_incidente || 'Incidente'}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </article>
+              )}
+
+              {showGuardListSection && (
+                <article className="dashboard-card list-section">
+                  <div className="section-header compact-header">
+                    <div>
+                      <h2>{listSectionTitle}</h2>
+                      <p>{listSectionSubtitle}</p>
+                    </div>
+                  </div>
+
+                  <div className="incident-list-scroll">
+                    <IncidentList
+                      incidents={listIncidents}
+                      loading={loading}
+                      onSelect={setSelectedIncident}
+                      onMap={handleShowIncidentOnMap}
+                      onStatusUpdate={
+                        showListActions ? handleIncidentStatusUpdate : undefined
+                      }
+                      showActions={showListActions}
+                      emptyMessage={
+                        isGuard && activeMenu === 'Mis asignaciones'
+                          ? 'No tienes una asignación activa.'
+                          : isGuard && activeMenu === 'Historial'
+                          ? 'No tienes incidentes cerrados en tu historial.'
+                          : 'No se encontraron incidentes.'
+                      }
                     />
                   </div>
                 </article>
               )}
-
-            {isAdmin && activeMenu === 'Estadísticas' && (
-              <AdminStatsPanel incidents={filteredIncidents} />
-            )}
-
-            {showMapSection && (
-              <article className="dashboard-card map-section">
-                <div className="section-header compact-header">
-                  <div>
-                    <h2>{mapTitle}</h2>
-                    <p>{mapSubtitle}</p>
-                  </div>
-                </div>
-
-                <div className="map-wrapper">
-                  <IncidentMap
-                    incidents={mapIncidents}
-                    loading={loading}
-                    selectedIncident={focusedMapIncident || selectedIncident}
-                    onMarkerClick={(incident) => {
-                      setFocusedMapIncident(incident)
-                      setSelectedIncident(incident)
-                    }}
-                    isAdmin={user?.rol === 'administrador'}
-                  />
-
-                  <ZoneLegend zones={zones} />
-                </div>
-              </article>
-            )}
-
-            {showListSection && (
-              <article className="dashboard-card list-section">
-                <div className="section-header compact-header">
-                  <div>
-                    <h2>{listSectionTitle}</h2>
-                    <p>{listSectionSubtitle}</p>
-                  </div>
-                </div>
-
-                <div className="incident-list-scroll">
-                  <IncidentList
-                    incidents={listIncidents}
-                    loading={loading}
-                    onSelect={setSelectedIncident}
-                    onMap={handleShowIncidentOnMap}
-                    onStatusUpdate={
-                      showListActions
-                        ? handleIncidentStatusUpdate
-                        : undefined
-                    }
-                    showActions={showListActions}
-                    emptyMessage={
-                      isGuard && activeMenu === 'Mis asignaciones'
-                        ? 'No tienes incidentes asignados aún.'
-                        : isGuard && activeMenu === 'Historial'
-                        ? 'Todavía no tienes casos cerrados en tu historial.'
-                        : isAdmin && activeMenu === 'Historial general'
-                        ? 'Todavía no hay incidentes cerrados en el sistema.'
-                        : 'No hay incidentes reportados.'
-                    }
-                  />
-                </div>
-              </article>
-            )}
-
-            {showSummaryCards && (
-              <section className="dashboard-cards bottom-cards">
-                <article className="summary-card bg-white shadow-sm">
-                  <span className="summary-label">
-                    {isGuard ? 'Activos' : 'Total incidentes'}
-                  </span>
-                  <p className="summary-number">
-                    {isGuard ? activeIncidents.length : totalIncidents}
-                  </p>
-                </article>
-
-                <article className="summary-card bg-white shadow-sm">
-                  <span className="summary-label">Atendiendo</span>
-                  <p className="summary-number">{attendedCount}</p>
-                </article>
-
-                <article className="summary-card bg-white shadow-sm">
-                  <span className="summary-label">
-                    {isGuard ? 'Mis Asignaciones' : 'Pendientes'}
-                  </span>
-                  <p className="summary-number">
-                    {isGuard ? assignedIncidents.length : pendingCount}
-                  </p>
-                </article>
-
-                {isAdmin && (
-                  <article className="summary-card bg-white shadow-sm">
-                    <span className="summary-label">Emergencias</span>
-                    <p className="summary-number">{emergenciesCount}</p>
-                  </article>
-                )}
-              </section>
-            )}
-          </section>
+            </section>
+          )}
         </div>
-      </div>
 
         {selectedIncident && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-9999 flex items-center justify-center p-4">
@@ -1421,33 +1331,16 @@ const menuIncidents = useMemo(() => {
 
               <div className="overflow-y-auto p-6 space-y-5">
                 <div>
-<div>
-  <div className="flex items-center gap-2 mb-1">
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      className="w-4 h-4 text-uta-red"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-      <circle cx="12" cy="10" r="3" />
-    </svg>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                      Ubicación
+                    </span>
+                  </div>
 
-    <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-      Ubicación
-    </span>
-  </div>
-
-  <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
-    {(selectedIncident as any).ubicacion ||
-      selectedIncident.zona?.nombre ||
-      'No especificada'}
-  </div>
-</div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
+                    {(selectedIncident as any).ubicacion ||
+                      selectedIncident.zona?.nombre ||
+                      'No especificada'}
                   </div>
                 </div>
 
@@ -1455,81 +1348,60 @@ const menuIncidents = useMemo(() => {
                   <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
                     Descripción
                   </span>
+
                   <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700 mt-1">
-                    {selectedIncident.descripcion}
+                    {selectedIncident.descripcion || 'Sin descripción'}
                   </div>
                 </div>
 
-                {/* ── Zona del incidente ── */}
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-uta-red"
-                      viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="3 11 22 2 13 21 11 13 3 11" />
-                    </svg>
-                    <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                      Zona del campus
-                    </span>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Zona del campus
+                  </span>
+
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700 mt-1">
                     {selectedIncident.zona_id
-                      ? zones.find(z => z.id === selectedIncident.zona_id)?.nombre
-                        ?? `Zona #${selectedIncident.zona_id}`
+                      ? zones.find(
+                          (z) => String(z.id) === String(selectedIncident.zona_id)
+                        )?.nombre ?? `Zona #${selectedIncident.zona_id}`
                       : 'Zona no identificada'}
                   </div>
                 </div>
 
                 <div>
-  <div className="flex items-center gap-2 mb-1">
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      className="w-4 h-4 text-uta-red"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Guardia asignado
+                  </span>
 
-    <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-      Guardia asignado
-    </span>
-  </div>
-
-  <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
-    {selectedIncident.guardia_id
-      ? `Guardia #${selectedIncident.guardia_id}`
-      : 'Sin asignar'}
-  </div>
-</div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700 mt-1">
+                    {selectedIncident.guardia_id
+                      ? `Guardia #${selectedIncident.guardia_id}`
+                      : 'Sin asignar'}
+                  </div>
+                </div>
 
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-uta-red" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                    <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Guardias de Apoyo</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Guardias de apoyo
+                  </span>
+
+                  <div className="mt-2">
+                    <AssignedGuardsList
+                      guards={assignedGuards}
+                      loading={guardsLoading}
+                      primaryGuardId={String(selectedIncident.guardia_id)}
+                    />
                   </div>
-                  <AssignedGuardsList
-                    guards={assignedGuards}
-                    loading={guardsLoading}
-                    primaryGuardId={String(selectedIncident.guardia_id)}
-                  />
+
                   {selectedIncident.estado !== 'Cerrado' &&
                     String(selectedIncident.guardia_id) !== guardId && (
                       <div className="mt-3">
                         <ConfirmAttendanceButton
                           incidentId={Number(selectedIncident.id)}
                           guardId={guardIdNum}
-                          isAlreadyAssigned={assignedGuards.some((g) => g.guardia_id === guardIdNum)}
+                          isAlreadyAssigned={assignedGuards.some(
+                            (g) => g.guardia_id === guardIdNum
+                          )}
                           onConfirm={() => {}}
                         />
                       </div>

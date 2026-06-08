@@ -11,17 +11,24 @@ import { getZoneByPoint } from '../../services/polygonService'
 import { supabase } from '../../services/supabaseClient'
 import { getCurrentUser } from '../../services/authService'
 import { emergencySocket } from '../../services/emergencySocket'
-import { getUserTrustGroups, getGroupMembers, notifyGroupMembers } from '../../services/trustGroupService'
+import {
+  getUserTrustGroups,
+  getGroupMembers,
+  notifyGroupMembers,
+} from '../../services/trustGroupService'
 import { useEmergencySocket } from '../../hooks/useEmergencySocket'
 import { useAudioAlert } from '../../hooks/useAudioAlert'
+
+// Tipo que se reporta desde los botones rápidos (A-15)
+type QuickType = 'robo' | 'pelea' | 'accidente' | 'otro'
 
 type IncidentType =
   | ''
   | 'robo'
-  | 'agresion'
+  | 'pelea'
+  | 'accidente'
   | 'vandalismo'
   | 'sospechoso'
-  | 'accidente'
   | 'otro'
 
 interface FormData {
@@ -36,15 +43,31 @@ interface CurrentLocation {
   longitud: number
 }
 
+// Opciones del selector (solo se usa cuando el tipo NO está bloqueado, es decir "Otro")
 const INCIDENT_TYPES: { value: IncidentType; label: string }[] = [
   { value: '', label: 'Seleccionar tipo...' },
   { value: 'robo', label: 'Robo / Hurto' },
-  { value: 'agresion', label: 'Agresión Física' },
+  { value: 'pelea', label: 'Pelea / Agresión' },
+  { value: 'accidente', label: 'Accidente' },
   { value: 'vandalismo', label: 'Vandalismo' },
   { value: 'sospechoso', label: 'Persona Sospechosa' },
-  { value: 'accidente', label: 'Accidente' },
   { value: 'otro', label: 'Otro' },
 ]
+
+const TYPE_LABEL: Record<QuickType, string> = {
+  robo: 'Robo',
+  pelea: 'Pelea',
+  accidente: 'Accidente',
+  otro: 'Otro',
+}
+
+// Descripción automática inicial por tipo (el usuario completa el resto en el formulario)
+const AUTO_DESCRIPTION: Record<QuickType, string> = {
+  robo: 'Reporte rápido: Robo / hurto.',
+  pelea: 'Reporte rápido: Pelea / agresión física.',
+  accidente: 'Reporte rápido: Accidente.',
+  otro: 'Emergencia reportada (sin detalles aún)',
+}
 
 const INITIAL_FORM_DATA: FormData = {
   tipo: '',
@@ -54,41 +77,102 @@ const INITIAL_FORM_DATA: FormData = {
 }
 
 const HOLD_DURATION = 2000
-const BUTTON_RADIUS = 96
-const CIRCUMFERENCE = 2 * Math.PI * BUTTON_RADIUS
 
-function getCurrentLocation(): Promise<CurrentLocation> {
+// ─── Geolocalización optimizada para velocidad (emergencias) ──
+// Envoltorio en promesa
+function getPosition(options: PositionOptions): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Tu navegador no permite obtener la ubicación.'))
-      return
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          latitud: position.coords.latitude,
-          longitud: position.coords.longitude,
-        })
-      },
-      (error) => {
-        if (error.code === error.PERMISSION_DENIED) {
-          reject(new Error('Debes permitir el acceso a tu ubicación para enviar la emergencia.'))
-          return
-        }
-        if (error.code === error.TIMEOUT) {
-          reject(new Error('No se pudo obtener tu ubicación a tiempo. Intenta nuevamente.'))
-          return
-        }
-        reject(new Error('No se pudo obtener tu ubicación actual.'))
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    )
+    navigator.geolocation.getCurrentPosition(resolve, reject, options)
   })
 }
 
+// Códigos: 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
+const isPermissionDenied = (err: any) => err && err.code === 1
+
+// Pre-calienta la ubicación al abrir la pantalla, para que al presionar
+// el botón el sistema ya tenga una lectura en caché (respuesta casi instantánea).
+function prewarmLocation() {
+  if (!navigator.geolocation) return
+  console.log('[GEO] 0) Pre-calentando ubicación...')
+  navigator.geolocation.getCurrentPosition(
+    (pos) =>
+      console.log('[GEO] 0) Pre-calentado OK', {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+      }),
+    (err) => console.log('[GEO] 0) Pre-calentado falló (no bloquea):', err?.code, err?.message),
+    { enableHighAccuracy: false, timeout: 8000, maximumAge: 120000 }
+  )
+}
+
+async function getCurrentLocation(): Promise<CurrentLocation> {
+  console.log('[GEO] 1) Iniciando obtención de ubicación...')
+
+  if (!navigator.geolocation) {
+    console.error('[GEO] navigator.geolocation NO está disponible en este navegador/contexto')
+    throw new Error('Tu navegador no permite obtener la ubicación.')
+  }
+
+  if (navigator.permissions?.query) {
+    navigator.permissions
+      .query({ name: 'geolocation' as PermissionName })
+      .then((status) => console.log('[GEO] 2) Estado del permiso:', status.state))
+      .catch(() => {})
+  }
+
+  const startedAt = Date.now()
+
+  // 1) Intento RÁPIDO: baja precisión (red/wifi) + acepta caché de hasta 2 min.
+  //    Suele responder en 1-3 s (o al instante si hay caché del pre-calentado).
+  try {
+    console.log('[GEO] 3a) Intento rápido (baja precisión, timeout 7s, cache 2min)...')
+    const pos = await getPosition({
+      enableHighAccuracy: false,
+      timeout: 7000,
+      maximumAge: 120000,
+    })
+    console.log(`[GEO] ✅ 4a) Rápido OK en ${Date.now() - startedAt} ms`, {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+    })
+    return { latitud: pos.coords.latitude, longitud: pos.coords.longitude }
+  } catch (fastErr: any) {
+    console.warn(`[GEO] ⚠️ 4a) Intento rápido falló -> code=${fastErr?.code} message="${fastErr?.message}"`)
+    if (isPermissionDenied(fastErr)) {
+      throw new Error('Debes permitir el acceso a tu ubicación para enviar la emergencia.')
+    }
+  }
+
+  // 2) Fallback: alta precisión (GPS), con un poco más de tiempo.
+  try {
+    console.log('[GEO] 3b) Fallback (alta precisión, timeout 15s)...')
+    const pos = await getPosition({
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 60000,
+    })
+    console.log(`[GEO] ✅ 4b) Fallback OK en ${Date.now() - startedAt} ms`, {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+    })
+    return { latitud: pos.coords.latitude, longitud: pos.coords.longitude }
+  } catch (slowErr: any) {
+    console.error(`[GEO] ❌ 4b) Fallback falló -> code=${slowErr?.code} message="${slowErr?.message}"`)
+    if (isPermissionDenied(slowErr)) {
+      throw new Error('Debes permitir el acceso a tu ubicación para enviar la emergencia.')
+    }
+    if (slowErr?.code === 3) {
+      throw new Error('No se pudo obtener tu ubicación a tiempo. Intenta nuevamente.')
+    }
+    throw new Error('No se pudo obtener tu ubicación actual.')
+  }
+}
+
 export default function IncidentReportForm() {
-  // phase: 'idle' = botón de pánico | 'form' = emergencia ya enviada, detalles opcionales
+  // phase: 'idle' = botones rápidos | 'form' = emergencia ya enviada, completar detalles
   const [phase, setPhase] = useState<'idle' | 'form'>('idle')
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA)
   const [fileError, setFileError] = useState('')
@@ -96,16 +180,20 @@ export default function IncidentReportForm() {
   const [statusMessage, setStatusMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
-  const [holdProgress, setHoldProgress] = useState(0)
-  const [isHolding, setIsHolding] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' } | null>(null)
   const [activeIncidentId, setActiveIncidentId] = useState<number | null>(null)
 
-  const { playAlert: playTrustedAlert } = useAudioAlert()
+  // Cuando el tipo ya viene definido por el botón (Robo/Accidente/Pelea) se oculta el selector.
+  const [lockTipo, setLockTipo] = useState(false)
 
+  // Mantener presionado 2 s
+  const [holdingType, setHoldingType] = useState<QuickType | null>(null)
+  const [holdProgress, setHoldProgress] = useState(0)
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const startTimeRef = useRef(0)
+
+  const { playAlert: playTrustedAlert } = useAudioAlert()
 
   const clearHoldTimer = useCallback(() => {
     if (holdTimerRef.current) {
@@ -124,8 +212,9 @@ export default function IncidentReportForm() {
     setSubmitError('')
     setStatusMessage('')
     setActiveIncidentId(null)
+    setLockTipo(false)
+    setHoldingType(null)
     setHoldProgress(0)
-    setIsHolding(false)
     setPhase('idle')
   }, [])
 
@@ -134,29 +223,44 @@ export default function IncidentReportForm() {
     if (user?.id) {
       emergencySocket.connect('affected', String(user.id))
     }
+    // Pre-calentamos la ubicación para que el envío sea casi inmediato
+    prewarmLocation()
     return () => {
       clearHoldTimer()
     }
   }, [clearHoldTimer])
 
-  // 1) Crear y enviar la emergencia inmediatamente (con ubicación) al guardia
-  const sendEmergency = useCallback(async () => {
+  // 1) Crear y enviar la emergencia con el tipo seleccionado, luego abrir el formulario
+  const sendEmergency = useCallback(async (tipoSeleccionado: QuickType) => {
+    console.log('[SEND] Enviando emergencia, tipo =', tipoSeleccionado)
     setSubmitError('')
     setIsSending(true)
 
     try {
       const user = getCurrentUser()
+      console.log('[SEND] Usuario:', user?.id, user?.nombre)
       const location = await getCurrentLocation()
-      const zone = await getZoneByPoint(location.latitud, location.longitud)
+      console.log('[SEND] Ubicación lista, buscando zona...', location)
+
+      // La zona es opcional: si falla, no bloquea el envío
+      let zonaId: number | null = null
+      try {
+        const zone = await getZoneByPoint(location.latitud, location.longitud)
+        zonaId = zone?.id ?? null
+        console.log('[SEND] Zona detectada:', zonaId)
+      } catch (e) {
+        console.warn('[SEND] No se pudo detectar zona (continuamos sin zona):', e)
+        zonaId = null
+      }
 
       const { data: newIncident, error } = await supabase
         .from('incidentes')
         .insert([
           {
             usuario_id: user?.id || null,
-            zona_id: zone?.id || null,    
-            tipo_incidente: 'otro',
-            descripcion: 'Emergencia reportada (sin detalles aún)',
+            zona_id: zonaId,
+            tipo_incidente: tipoSeleccionado,
+            descripcion: AUTO_DESCRIPTION[tipoSeleccionado],
             estado: 'Pendiente',
             latitud: location.latitud,
             longitud: location.longitud,
@@ -172,9 +276,15 @@ export default function IncidentReportForm() {
       }
 
       setActiveIncidentId(Number(newIncident.id))
+      // Pre-cargamos el tipo. Para Robo/Accidente/Pelea queda bloqueado; para Otro se elige luego.
+      setFormData((prev) => ({
+        ...prev,
+        tipo: tipoSeleccionado === 'otro' ? '' : tipoSeleccionado,
+      }))
+      setLockTipo(tipoSeleccionado !== 'otro')
 
-      // Collect trusted group member IDs for real-time WS notification
-      let trustedGroupUserIds: string[] = []
+      // IDs de miembros de grupos de confianza para la alerta en tiempo real
+      const trustedGroupUserIds: string[] = []
       if (user?.id) {
         const userId = Number(user.id)
         const groups = await getUserTrustGroups(userId)
@@ -190,18 +300,23 @@ export default function IncidentReportForm() {
             Number(group.id),
             Number(newIncident.id),
             userId,
-            `🚨 ${user?.nombre || 'Un usuario'} reportó una emergencia en el grupo ${group.nombre}`
+            `🚨 ${user?.nombre || 'Un usuario'} reportó ${TYPE_LABEL[tipoSeleccionado]} en el grupo ${group.nombre}`
           )
         }
       }
 
+      // El guardia recibe el incidente con el tipo correcto desde la alerta inicial
       emergencySocket.createIncident(
-        { ...newIncident, victimName: user?.nombre || 'Un usuario' },
+        {
+          ...newIncident,
+          tipo_incidente: tipoSeleccionado,
+          victimName: user?.nombre || 'Un usuario',
+        },
         trustedGroupUserIds
       )
 
       setStatusMessage(
-        'Emergencia enviada. El guardia ya fue alertado con tu ubicación. Si quieres, agrega detalles abajo.'
+        `Emergencia de tipo "${TYPE_LABEL[tipoSeleccionado]}" enviada. El guardia ya fue alertado con tu ubicación. Completa la información a continuación.`
       )
       setPhase('form')
     } catch (err) {
@@ -213,7 +328,43 @@ export default function IncidentReportForm() {
     }
   }, [])
 
-  // 2) Enviar detalles opcionales -> actualiza el incidente y avisa al guardia en tiempo real
+  // ── Lógica de "mantener presionado 2 s" (los 4 botones) ──
+  const updateProgress = useCallback(() => {
+    const elapsed = Date.now() - startTimeRef.current
+    const progress = Math.min(elapsed / HOLD_DURATION, 1)
+    setHoldProgress(progress)
+    if (progress < 1) {
+      animationFrameRef.current = requestAnimationFrame(updateProgress)
+    }
+  }, [])
+
+  const startHold = useCallback(
+    (tipo: QuickType) => {
+      if (isSending || holdingType) return
+      setSubmitError('')
+      setHoldingType(tipo)
+      setHoldProgress(0)
+      startTimeRef.current = Date.now()
+      animationFrameRef.current = requestAnimationFrame(updateProgress)
+      holdTimerRef.current = setTimeout(() => {
+        clearHoldTimer()
+        setHoldingType(null)
+        setHoldProgress(0)
+        // El incidente se envía apenas se completan los 2 segundos
+        console.log('[HOLD] 2s completados para tipo =', tipo, '-> enviando')
+        void sendEmergency(tipo)
+      }, HOLD_DURATION)
+    },
+    [isSending, holdingType, updateProgress, clearHoldTimer, sendEmergency]
+  )
+
+  const cancelHold = useCallback(() => {
+    clearHoldTimer()
+    setHoldingType(null)
+    setHoldProgress(0)
+  }, [clearHoldTimer])
+
+  // 2) Enviar detalles -> actualiza el incidente y avisa al guardia (sin alerta duplicada)
   const handleUpdateDetails = useCallback(
     async (event: FormEvent) => {
       event.preventDefault()
@@ -308,35 +459,6 @@ export default function IncidentReportForm() {
     setFormData((prev) => ({ ...prev, foto: file }))
   }
 
-  const updateProgress = useCallback(() => {
-    const elapsed = Date.now() - startTimeRef.current
-    const progress = Math.min(elapsed / HOLD_DURATION, 1)
-    setHoldProgress(progress)
-    if (progress < 1) {
-      animationFrameRef.current = requestAnimationFrame(updateProgress)
-    }
-  }, [])
-
-  const startHold = useCallback(() => {
-    if (isHolding || isSending) return
-    setIsHolding(true)
-    setHoldProgress(0)
-    startTimeRef.current = Date.now()
-    animationFrameRef.current = requestAnimationFrame(updateProgress)
-    holdTimerRef.current = setTimeout(() => {
-      clearHoldTimer()
-      setHoldProgress(1)
-      setIsHolding(false)
-      void sendEmergency()
-    }, HOLD_DURATION)
-  }, [isHolding, isSending, updateProgress, clearHoldTimer, sendEmergency])
-
-  const cancelHold = useCallback(() => {
-    clearHoldTimer()
-    setHoldProgress(0)
-    setIsHolding(false)
-  }, [clearHoldTimer])
-
   // Aviso del guardia hacia el estudiante (en camino / caso cerrado)
   const handleIncidentUpdated = useCallback(
     (payload: any) => {
@@ -405,24 +527,36 @@ export default function IncidentReportForm() {
               Detalles del incidente <span className="text-gray-400 font-normal">(opcional)</span>
             </p>
 
-            <div>
-              <label htmlFor="tipo" className="block text-sm font-semibold text-uta-navy mb-1">
-                Tipo de incidente
-              </label>
-              <select
-                id="tipo"
-                name="tipo"
-                value={formData.tipo}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold"
-              >
-                {INCIDENT_TYPES.map((type) => (
-                  <option key={type.value} value={type.value} disabled={type.value === ''}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Tipo: si viene de Robo/Accidente/Pelea queda fijo; en "Otro" se elige */}
+            {lockTipo ? (
+              <div>
+                <span className="block text-sm font-semibold text-uta-navy mb-1">
+                  Tipo de incidente
+                </span>
+                <div className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-700 font-semibold">
+                  {TYPE_LABEL[(formData.tipo || 'otro') as QuickType] ?? formData.tipo}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="tipo" className="block text-sm font-semibold text-uta-navy mb-1">
+                  Tipo de incidente
+                </label>
+                <select
+                  id="tipo"
+                  name="tipo"
+                  value={formData.tipo}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-uta-gold focus:border-uta-gold"
+                >
+                  {INCIDENT_TYPES.map((type) => (
+                    <option key={type.value} value={type.value} disabled={type.value === ''}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label htmlFor="ubicacion" className="block text-sm font-semibold text-uta-navy mb-1">
@@ -505,69 +639,108 @@ export default function IncidentReportForm() {
     )
   }
 
-  // ----- Vista: botón de pánico (idle) -----
+  // Handlers comunes para un botón "mantener presionado".
+  // No usamos e.preventDefault() en onTouchStart porque React registra
+  // los listeners táctiles como "passive" y lanzaría un warning.
+  // El comportamiento por defecto se evita con la clase CSS `touch-none`.
+  const holdHandlers = (tipo: QuickType) => ({
+    onMouseDown: () => startHold(tipo),
+    onMouseUp: cancelHold,
+    onMouseLeave: cancelHold,
+    onTouchStart: () => startHold(tipo),
+    onTouchEnd: cancelHold,
+    onTouchCancel: cancelHold,
+  })
+
+  // Barra de progreso inferior mientras se mantiene presionado
+  const HoldProgress = ({ tipo }: { tipo: QuickType }) =>
+    holdingType === tipo ? (
+      <span
+        className="absolute bottom-0 left-0 h-1.5 bg-white/80 rounded-full pointer-events-none transition-[width] duration-75"
+        style={{ width: `${Math.round(holdProgress * 100)}%` }}
+      />
+    ) : null
+
+    // ----- Vista: botones rápidos de emergencia (idle) -----
   return (
-    <div className="max-w-md mx-auto">
+    <div className="w-full max-w-md mx-auto h-full overflow-hidden">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      <div className="flex flex-col items-center justify-center px-4 py-6">
-        <div className="text-center mb-6">
-          <h2 className="text-xl font-bold text-uta-navy mb-2">
-            ¿Presencias algo inusual?
+      <div className="h-full overflow-hidden flex flex-col">
+        <div className="h-[9%] flex flex-col items-center justify-center text-center px-2">
+          <h2 className="text-[clamp(1rem,4vw,1.3rem)] font-bold text-uta-navy leading-tight">
+            ¿Presencias una emergencia?
           </h2>
-          <p className="text-gray-600 text-sm">
+
+          <p className="text-gray-600 text-[clamp(0.7rem,2.8vw,0.85rem)] leading-tight">
             {isSending
               ? 'Enviando tu emergencia con la ubicación...'
-              : 'Mantén presionado el botón 2 segundos para enviar la emergencia'}
+              : 'Mantén presionado 2 segundos el tipo de emergencia'}
           </p>
         </div>
 
         {submitError && (
-          <div className="mb-4 w-full p-2 bg-red-50 border border-uta-red rounded-lg">
-            <p className="text-uta-red text-xs font-medium text-center">{submitError}</p>
+          <div className="h-[7%] px-1 flex items-center">
+            <div className="w-full p-2 bg-red-50 border border-uta-red rounded-lg">
+              <p className="text-uta-red text-xs font-medium text-center leading-snug">
+                {submitError}
+              </p>
+            </div>
           </div>
         )}
 
-        <div className="relative flex items-center justify-center w-56 h-56 mx-auto">
-          <svg className="absolute w-56 h-56 -rotate-90 pointer-events-none" viewBox="0 0 200 200">
-            <circle cx="100" cy="100" r={BUTTON_RADIUS} fill="none" stroke="rgba(192, 0, 0, 0.2)" strokeWidth="6" />
-            {holdProgress > 0 && (
-              <circle
-                cx="100"
-                cy="100"
-                r={BUTTON_RADIUS}
-                fill="none"
-                stroke="#FFBD00"
-                strokeWidth="6"
-                strokeLinecap="round"
-                strokeDasharray={CIRCUMFERENCE}
-                strokeDashoffset={CIRCUMFERENCE * (1 - holdProgress)}
-              />
-            )}
-          </svg>
-
+        <div className={`${submitError ? 'h-[82%]' : 'h-[89%]'} overflow-hidden flex flex-col gap-[1.5%]`}>
+          {/* ROBO — botón principal */}
           <button
-            onMouseDown={startHold}
-            onMouseUp={cancelHold}
-            onMouseLeave={cancelHold}
-            onTouchStart={(event) => {
-              event.preventDefault()
-              startHold()
-            }}
-            onTouchEnd={cancelHold}
-            onTouchCancel={cancelHold}
+            type="button"
+            {...holdHandlers('robo')}
             disabled={isSending}
-            className={`w-56 h-56 rounded-full bg-red-600 text-white font-bold text-xl flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.6)] hover:bg-red-700 active:scale-95 transition-all mx-auto text-center p-4 select-none touch-none focus:outline-none disabled:opacity-70 ${
-              isHolding ? 'bg-red-700 scale-105' : 'hover:shadow-2xl hover:scale-105'
-            }`}
-            aria-label="Mantén presionado para enviar emergencia"
+            className="relative overflow-hidden w-full h-[51%] rounded-3xl bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white font-bold shadow-lg flex flex-col items-center justify-center gap-[4%] select-none touch-none transition-all disabled:opacity-60"
+            aria-label="Mantén presionado para reportar Robo"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-            </svg>
-            <span className="leading-tight text-sm px-2 text-center">
-              {isSending ? 'ENVIANDO...' : '¡REPORTAR\u00A0EMERGENCIA!'}
-            </span>
+            <span className="text-[clamp(4.2rem,19vw,7rem)] leading-none">🦹</span>
+            <span className="text-[clamp(1.9rem,7vw,2.8rem)] leading-none">Robo</span>
+            <HoldProgress tipo="robo" />
+          </button>
+
+          {/* ACCIDENTE + PELEA */}
+          <div className="grid grid-cols-2 gap-[2.5%] h-[30%]">
+            <button
+              type="button"
+              {...holdHandlers('accidente')}
+              disabled={isSending}
+              className="relative overflow-hidden h-full flex flex-col items-center justify-center gap-[6%] rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold shadow-lg select-none touch-none transition-all disabled:opacity-60"
+              aria-label="Mantén presionado para reportar Accidente"
+            >
+              <span className="text-[clamp(2.6rem,11vw,4.4rem)] leading-none">🚑</span>
+              <span className="text-[clamp(1.05rem,4.6vw,1.55rem)] leading-none">Accidente</span>
+              <HoldProgress tipo="accidente" />
+            </button>
+
+            <button
+              type="button"
+              {...holdHandlers('pelea')}
+              disabled={isSending}
+              className="relative overflow-hidden h-full flex flex-col items-center justify-center gap-[6%] rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold shadow-lg select-none touch-none transition-all disabled:opacity-60"
+              aria-label="Mantén presionado para reportar Pelea"
+            >
+              <span className="text-[clamp(2.6rem,11vw,4.4rem)] leading-none">🥊</span>
+              <span className="text-[clamp(1.05rem,4.6vw,1.55rem)] leading-none">Pelea</span>
+              <HoldProgress tipo="pelea" />
+            </button>
+          </div>
+
+          {/* OTRO */}
+          <button
+            type="button"
+            {...holdHandlers('otro')}
+            disabled={isSending}
+            className="relative overflow-hidden w-full h-[16%] rounded-2xl bg-gray-600 hover:bg-gray-700 active:scale-[0.98] text-white font-bold shadow-lg flex items-center justify-center gap-[3%] select-none touch-none transition-all disabled:opacity-60"
+            aria-label="Mantén presionado para reportar Otro"
+          >
+            <span className="text-[clamp(2rem,8vw,3.2rem)] leading-none">⚠️</span>
+            <span className="text-[clamp(1.1rem,4.8vw,1.6rem)] leading-none">Otro</span>
+            <HoldProgress tipo="otro" />
           </button>
         </div>
       </div>
