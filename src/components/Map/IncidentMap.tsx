@@ -1,20 +1,39 @@
 import {
   GoogleMap,
+  useJsApiLoader,
   Marker,
   InfoWindow,
   Polygon,
-  useJsApiLoader,
+  Circle,
 } from '@react-google-maps/api'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Incident } from '../../types/incident'
+import type { Camera } from '../../types/camera'
 import { usePolygons } from '../../hooks/usePolygons'
-import { getZoneByPoint } from '../../services/polygonService'
+import { useCameras } from '../../hooks/useCameras'
+import { useUserLocation } from '../../hooks/useUserLocation'
+import {
+  getZoneByPoint,
+  getPolygonCenter,
+  getGuardPostsFromDB,
+  type ZonePolygon,
+  type GuardPost,
+} from '../../services/polygonService'
+import {
+  createCamera,
+  updateCamera,
+  deleteCamera,
+} from '../../services/cameraService'
+import './IncidentMap.css'
 
+// ─── Props ────────────────────────────────────────────────────
 interface IncidentMapProps {
   incidents: Incident[]
   loading: boolean
   selectedIncident?: Incident | null
   onMarkerClick?: (incident: Incident) => void
+  isAdmin?: boolean
+  onLocationDetected?: (lat: number, lng: number) => void
 }
 
 const mapContainerStyle = {
@@ -29,23 +48,136 @@ const defaultCenter = {
 
 const defaultZoom = 17
 
+// ── Icono SVG escudo (puestos de guardia) ─────────────────────
+const GUARD_ICON_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">' +
+  '<circle cx="20" cy="20" r="18" fill="#1a56db" stroke="#ffffff" stroke-width="3"/>' +
+  '<path d="M20 8 L28 12 L28 22 C28 27 20 32 20 32 C20 32 12 27 12 22 L12 12 Z" fill="#ffffff" fill-opacity="0.9"/>' +
+  '<path d="M17 20 L19 22 L23 17" stroke="#1a56db" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
+  '</svg>'
+
+const guardIconUrl = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+  GUARD_ICON_SVG
+)}`
+
+// ── Icono SVG punto azul (ubicación del usuario) ──────────────
+const USER_ICON_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">' +
+  '<circle cx="20" cy="20" r="14" fill="#4285F4" stroke="#ffffff" stroke-width="4"/>' +
+  '<circle cx="20" cy="20" r="5" fill="#ffffff"/>' +
+  '</svg>'
+
+const userIconUrl = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+  USER_ICON_SVG
+)}`
+
+// ─── Colores de incidente ─────────────────────────────────────
+const INCIDENT_COLORS: Record<string, string> = {
+  robo: '#FF0000',
+  agresion: '#FF6600',
+  vandalismo: '#FFAA00',
+  sospechoso: '#9900FF',
+  accidente: '#0066FF',
+  incendio: '#FF3300',
+  otro: '#666666',
+}
+
+const getIncidentColor = (tipo?: string): string => {
+  if (!tipo) return INCIDENT_COLORS.otro
+  return INCIDENT_COLORS[tipo.toLowerCase()] ?? INCIDENT_COLORS.otro
+}
+
+const formatDate = (incident: Incident) => {
+  const rawDate =
+    (incident as any).created_at ||
+    (incident as any).fecha ||
+    (incident as any).updated_at
+
+  if (!rawDate) return 'Fecha no disponible'
+
+  return new Date(rawDate).toLocaleString('es-EC', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+// ─────────────────────────────────────────────────────────────
 export default function IncidentMap({
   incidents,
   loading,
   onMarkerClick,
   selectedIncident = null,
+  isAdmin = false,
+  onLocationDetected,
 }: IncidentMapProps) {
-  const [selectedMarker, setSelectedMarker] = useState<Incident | null>(null)
-  const [incidentsWithZone, setIncidentsWithZone] = useState<Incident[]>([])
-
   const mapRef = useRef<google.maps.Map | null>(null)
-  const { zones } = usePolygons()
 
-  const { isLoaded } = useJsApiLoader({
+  const [selectedGuardPost, setSelectedGuardPost] =
+    useState<GuardPost | null>(null)
+  const [hoveredZone, setHoveredZone] = useState<ZonePolygon | null>(null)
+  const [selectedMarker, setSelectedMarker] = useState<Incident | null>(null)
+  const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null)
+
+  const [showCameras, setShowCameras] = useState(false)
+  const [isAddCameraMode, setIsAddCameraMode] = useState(false)
+  const [newCameraCoords, setNewCameraCoords] = useState<{
+    lat: number
+    lng: number
+  } | null>(null)
+
+  const [cameraName, setCameraName] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+
+  const [cameraToDelete, setCameraToDelete] = useState<Camera | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const [editingCamera, setEditingCamera] = useState<Camera | null>(null)
+  const [editCameraName, setEditCameraName] = useState('')
+  const [editCameraStatus, setEditCameraStatus] = useState<
+    'Activa' | 'Inactiva'
+  >('Activa')
+  const [isUpdating, setIsUpdating] = useState(false)
+
+  const [incidentsWithZone, setIncidentsWithZone] = useState<Incident[]>([])
+  const [guardPosts, setGuardPosts] = useState<GuardPost[]>([])
+
+  const { zones } = usePolygons()
+  const {
+    cameras,
+    loading: camerasLoading,
+    refetch: refetchCameras,
+  } = useCameras()
+
+  const {
+    location,
+    status,
+    errorMsg,
+    requestLocation,
+    startWatching,
+    stopWatching,
+  } = useUserLocation()
+
+  const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string,
   })
 
+  // ── Cargar puestos de guardia ─────────────────────────────
+  useEffect(() => {
+    getGuardPostsFromDB().then(setGuardPosts)
+  }, [])
+
+  // ── Iniciar seguimiento continuo al montar ────────────────
+  useEffect(() => {
+    startWatching()
+    return () => stopWatching()
+  }, [startWatching, stopWatching])
+
+  // ── Asignar zona a cada incidente automáticamente ─────────
   useEffect(() => {
     let isMounted = true
 
@@ -66,7 +198,12 @@ export default function IncidentMap({
             return {
               ...incident,
               zona_id: zone?.id,
-              zona: zone ? { id: zone.id, nombre: zone.nombre } : undefined,
+              zona: zone
+                ? {
+                    id: zone.id,
+                    nombre: zone.nombre,
+                  }
+                : undefined,
             }
           }
 
@@ -86,22 +223,28 @@ export default function IncidentMap({
     }
   }, [incidents])
 
-  const incidentsWithLocation = incidentsWithZone.filter((incident) => {
-    const lat = Number(incident.latitud)
-    const lng = Number(incident.longitud)
+  // ── Cuando se obtiene ubicación, centrar mapa y notificar ──
+  useEffect(() => {
+    if (status !== 'success' || !location) return
 
-    return !Number.isNaN(lat) && !Number.isNaN(lng)
-  })
+    if (mapRef.current) {
+      mapRef.current.panTo({
+        lat: location.lat,
+        lng: location.lng,
+      })
+      mapRef.current.setZoom(19)
+    }
 
-  const handleMarkerClick = (incident: Incident) => {
-    setSelectedMarker(incident)
-    onMarkerClick?.(incident)
-  }
+    onLocationDetected?.(location.lat, location.lng)
+  }, [status, location, onLocationDetected])
 
+  // ── Cuando llega un incidente seleccionado desde fuera ─────
   useEffect(() => {
     if (!selectedIncident || !mapRef.current) return
 
     setSelectedMarker(selectedIncident)
+    setSelectedCamera(null)
+    setSelectedGuardPost(null)
 
     const lat = Number(selectedIncident.latitud)
     const lng = Number(selectedIncident.longitud)
@@ -112,64 +255,359 @@ export default function IncidentMap({
     }
   }, [selectedIncident])
 
-  const onMapLoad = (map: google.maps.Map) => {
+  const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map
-  }
+  }, [])
 
-  const onMapUnmount = () => {
+  const onMapUnmount = useCallback(() => {
     mapRef.current = null
+  }, [])
+
+  const handleMarkerClick = useCallback(
+    (incident: Incident) => {
+      setSelectedCamera(null)
+      setSelectedGuardPost(null)
+      setSelectedMarker(incident)
+
+      const lat = Number(incident.latitud)
+      const lng = Number(incident.longitud)
+
+      if (!Number.isNaN(lat) && !Number.isNaN(lng) && mapRef.current) {
+        mapRef.current.panTo({ lat, lng })
+        mapRef.current.setZoom(21)
+      }
+
+      onMarkerClick?.(incident)
+    },
+    [onMarkerClick]
+  )
+
+  const handleZoneClick = useCallback((zone: ZonePolygon) => {
+    setSelectedMarker(null)
+    setSelectedGuardPost(null)
+
+    if (mapRef.current && zone.coordenadas.length > 0) {
+      mapRef.current.panTo(getPolygonCenter(zone.coordenadas))
+      mapRef.current.setZoom(20)
+    }
+  }, [])
+
+  const handleGuardPostClick = useCallback((post: GuardPost) => {
+    setSelectedMarker(null)
+    setSelectedCamera(null)
+    setSelectedGuardPost(post)
+
+    if (mapRef.current) {
+      mapRef.current.panTo({
+        lat: post.lat,
+        lng: post.lng,
+      })
+      mapRef.current.setZoom(20)
+    }
+  }, [])
+
+  const handleCreateCamera = async () => {
+    if (!newCameraCoords || !cameraName.trim()) return
+
+    setIsCreating(true)
+
+    const success = await createCamera({
+      nombre: cameraName.trim(),
+      latitud: newCameraCoords.lat,
+      longitud: newCameraCoords.lng,
+    })
+
+    setIsCreating(false)
+
+    if (success) {
+      await refetchCameras()
+      setNewCameraCoords(null)
+      setCameraName('')
+      setIsAddCameraMode(false)
+    } else {
+      alert('No se pudo crear la cámara. Intenta nuevamente.')
+    }
   }
 
-  const getIncidentColor = (tipo: string): string => {
-    const colors: Record<string, string> = {
-      robo: '#FF0000',
-      agresion: '#FF6600',
-      vandalismo: '#FFAA00',
-      sospechoso: '#9900FF',
-      accidente: '#0066FF',
-      incendio: '#FF3300',
-      otro: '#666666',
+  const handleCancelCamera = useCallback(() => {
+    setNewCameraCoords(null)
+    setCameraName('')
+    setIsAddCameraMode(false)
+  }, [])
+
+  const handleDeleteCamera = async (camera: Camera) => {
+    if (!camera) return
+
+    setIsDeleting(true)
+
+    const success = await deleteCamera(camera.id)
+
+    setIsDeleting(false)
+
+    if (success) {
+      setSelectedCamera(null)
+      setCameraToDelete(null)
+      await refetchCameras()
+    } else {
+      alert('No se pudo eliminar la cámara. Intenta nuevamente.')
+    }
+  }
+
+  const handleCancelDelete = useCallback(() => {
+    setCameraToDelete(null)
+  }, [])
+
+  const handleEditCamera = (camera: Camera) => {
+    setEditingCamera(camera)
+    setEditCameraName(camera.nombre)
+    setEditCameraStatus(camera.estado_conectividad)
+    setSelectedCamera(null)
+  }
+
+  const handleUpdateCamera = async () => {
+    if (!editingCamera || !editCameraName.trim()) return
+
+    setIsUpdating(true)
+
+    const success = await updateCamera(editingCamera.id, {
+      nombre: editCameraName.trim(),
+      estado_conectividad: editCameraStatus,
+    })
+
+    setIsUpdating(false)
+
+    if (success) {
+      await refetchCameras()
+      setEditingCamera(null)
+      setEditCameraName('')
+      setEditCameraStatus('Activa')
+    } else {
+      alert('No se pudo actualizar la cámara. Intenta nuevamente.')
+    }
+  }
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingCamera(null)
+    setEditCameraName('')
+    setEditCameraStatus('Activa')
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+
+      if (newCameraCoords) {
+        handleCancelCamera()
+      } else if (editingCamera) {
+        handleCancelEdit()
+      } else if (cameraToDelete) {
+        handleCancelDelete()
+      }
     }
 
-    return colors[tipo?.toLowerCase()] || colors.otro
-  }
+    window.addEventListener('keydown', handleKeyDown)
 
-  const formatDate = (fecha?: string) => {
-    if (!fecha) return 'Fecha no disponible'
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [
+    newCameraCoords,
+    editingCamera,
+    cameraToDelete,
+    handleCancelCamera,
+    handleCancelEdit,
+    handleCancelDelete,
+  ])
 
-    return new Date(fecha).toLocaleString('es-EC', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    })
-  }
-
-  if (loading || !isLoaded) {
+  if (loadError) {
     return (
-      <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
-        Cargando mapa...
+      <div className="w-full h-full bg-gray-200 flex items-center justify-center text-red-600">
+        ❌ Error al cargar Google Maps. Verifica tu API key.
       </div>
     )
   }
 
+  if (!isLoaded || loading) {
+    return (
+      <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+        <div className="map-loader">
+          <div className="spinner" />
+          <p>Cargando mapa...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const incidentsOnMap = incidentsWithZone.filter((incident) => {
+    const lat = Number(incident.latitud)
+    const lng = Number(incident.longitud)
+
+    return (
+      !Number.isNaN(lat) &&
+      !Number.isNaN(lng) &&
+      incident.estado !== 'Cerrado'
+    )
+  })
+
+  const locationBtnTitle =
+    status === 'loading'
+      ? 'Obteniendo ubicación…'
+      : status === 'success'
+      ? 'Centrar en mi ubicación'
+      : status === 'denied'
+      ? 'Permiso denegado'
+      : 'Mostrar mi ubicación'
+
   return (
     <div className="w-full h-full rounded-lg overflow-hidden relative bg-gray-100">
+      {incidentsOnMap.length === 0 && !showCameras && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/80">
+          <p className="text-gray-600 text-lg">
+            ✓ No hay incidentes en el Campus Huachi
+          </p>
+        </div>
+      )}
+
+      {/* Toggle para cámaras */}
+      <button
+        onClick={() => {
+          setShowCameras((prev) => !prev)
+          if (showCameras) setSelectedCamera(null)
+        }}
+        className={`absolute top-3 right-3 z-20 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold shadow-lg transition-all ${
+          showCameras
+            ? 'bg-uta-navy text-white'
+            : 'bg-white text-gray-700 hover:bg-gray-50'
+        }`}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-4 h-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+
+        {camerasLoading
+          ? 'Cargando cámaras...'
+          : showCameras
+          ? 'Ocultar Cámaras'
+          : 'Mostrar Cámaras'}
+      </button>
+
+      {/* Toggle modo añadir cámara */}
+      {isAdmin && (
+        <button
+          onClick={() => {
+            setIsAddCameraMode((prev) => !prev)
+            setNewCameraCoords(null)
+            setCameraName('')
+          }}
+          className={`absolute top-3 right-48 z-20 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold shadow-lg transition-all ${
+            isAddCameraMode
+              ? 'bg-red-600 text-white animate-pulse'
+              : 'bg-white text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-4 h-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+
+          {isAddCameraMode ? 'Cancelar' : 'Añadir Cámara'}
+        </button>
+      )}
+
+      {/* Chip de zona al hover */}
+      {hoveredZone && (
+        <div className="zone-hover-chip">
+          <span
+            className="zone-hover-swatch"
+            style={{ backgroundColor: hoveredZone.color }}
+          />
+          <span className="zone-hover-text">
+            <strong>{hoveredZone.nombre}</strong>
+            {hoveredZone.descripcion && (
+              <small>{hoveredZone.descripcion}</small>
+            )}
+          </span>
+        </div>
+      )}
+
+      {/* Botón flotante de ubicación */}
+      <button
+        className={`location-fab${status === 'loading' ? ' loading' : ''}${
+          status === 'denied' || status === 'error' ? ' error' : ''
+        }${status === 'success' ? ' active' : ''}`}
+        onClick={requestLocation}
+        title={locationBtnTitle}
+        disabled={status === 'loading'}
+      >
+        {status === 'loading' ? (
+          <span className="location-fab-spinner" />
+        ) : (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+            <circle cx="12" cy="12" r="8" strokeDasharray="2 3" />
+          </svg>
+        )}
+      </button>
+
+      {/* Toast de error de ubicación */}
+      {(status === 'denied' || status === 'error') && errorMsg && (
+        <div className="location-error-toast">
+          <span>⚠️ {errorMsg}</span>
+        </div>
+      )}
+
       <GoogleMap
-        onLoad={onMapLoad}
-        onUnmount={onMapUnmount}
         mapContainerStyle={mapContainerStyle}
         center={defaultCenter}
         zoom={defaultZoom}
+        onLoad={onMapLoad}
+        onUnmount={onMapUnmount}
         options={{
           mapTypeControl: true,
           streetViewControl: false,
           fullscreenControl: true,
           zoomControl: true,
         }}
+        onClick={(event) => {
+          if (isAddCameraMode && event.latLng) {
+            setNewCameraCoords({
+              lat: event.latLng.lat(),
+              lng: event.latLng.lng(),
+            })
+          }
+        }}
       >
+        {/* Polígonos de zonas */}
         {zones.map((zone) => (
           <Polygon
             key={zone.id}
@@ -179,12 +617,62 @@ export default function IncidentMap({
               strokeOpacity: 0.9,
               strokeWeight: 3,
               fillColor: zone.color,
-              fillOpacity: 0.12,
+              fillOpacity: hoveredZone?.id === zone.id ? 0.28 : 0.12,
+              clickable: !isAddCameraMode,
             }}
+            onMouseOver={() => setHoveredZone(zone)}
+            onMouseOut={() => setHoveredZone(null)}
+            onClick={() => handleZoneClick(zone)}
           />
         ))}
 
-        {incidentsWithLocation.map((incident) => (
+        {/* Puestos de guardia */}
+        {guardPosts.map((post) => (
+          <Marker
+            key={`guard-${post.id}`}
+            position={{
+              lat: post.lat,
+              lng: post.lng,
+            }}
+            title={post.nombre}
+            icon={guardIconUrl}
+            zIndex={10}
+            onClick={() => handleGuardPostClick(post)}
+          />
+        ))}
+
+        {/* InfoWindow puesto de guardia */}
+        {selectedGuardPost && (
+          <InfoWindow
+            position={{
+              lat: selectedGuardPost.lat,
+              lng: selectedGuardPost.lng,
+            }}
+            onCloseClick={() => setSelectedGuardPost(null)}
+          >
+            <div className="p-3 max-w-xs">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xl">🛡️</span>
+                <h3 className="font-bold text-sm text-gray-900">
+                  {selectedGuardPost.nombre}
+                </h3>
+              </div>
+
+              {selectedGuardPost.descripcion && (
+                <p className="text-xs text-gray-500">
+                  {selectedGuardPost.descripcion}
+                </p>
+              )}
+
+              <p className="text-xs text-blue-600 mt-1 font-semibold">
+                Puesto de Seguridad Activo
+              </p>
+            </div>
+          </InfoWindow>
+        )}
+
+        {/* Marcadores de incidentes */}
+        {incidentsOnMap.map((incident) => (
           <Marker
             key={incident.id}
             position={{
@@ -204,6 +692,51 @@ export default function IncidentMap({
           />
         ))}
 
+        {/* Marcadores de cámaras */}
+        {showCameras &&
+          cameras.map((camera) => (
+            <Marker
+              key={`camera-${camera.id}`}
+              position={{
+                lat: camera.latitud,
+                lng: camera.longitud,
+              }}
+              title={camera.nombre}
+              icon={{
+                url: '/camara-de-seguridad.png',
+                scaledSize: new google.maps.Size(32, 32),
+                anchor: new google.maps.Point(16, 16),
+              }}
+              onClick={() => {
+                setSelectedCamera(camera)
+                setSelectedMarker(null)
+                setSelectedGuardPost(null)
+              }}
+            />
+          ))}
+
+        {/* Marcador temporal de nueva cámara */}
+        {newCameraCoords && (
+          <Marker
+            position={newCameraCoords}
+            icon={{
+              path: 'M 0,-1 A 1,1 0 0,1 0,1 A 1,1 0 0,1 0,-1',
+              fillColor: '#DC2626',
+              fillOpacity: 1,
+              strokeColor: '#fff',
+              strokeWeight: 2.5,
+              scale: 11,
+            }}
+            label={{
+              text: '+',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: '#fff',
+            }}
+          />
+        )}
+
+        {/* InfoWindow incidente */}
         {selectedMarker &&
           Number(selectedMarker.latitud) &&
           Number(selectedMarker.longitud) && (
@@ -222,7 +755,7 @@ export default function IncidentMap({
                 {selectedMarker.zona_id != null && (
                   <p className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
                     📍{' '}
-                    {zones.find((z) => z.id === selectedMarker.zona_id)
+                    {zones.find((zone) => zone.id === selectedMarker.zona_id)
                       ?.nombre || 'Zona desconocida'}
                   </p>
                 )}
@@ -237,7 +770,12 @@ export default function IncidentMap({
                         : 'bg-green-200 text-green-900'
                     }`}
                   >
-                    {selectedMarker.estado === 'Atendido' ? 'Atendiendo' : selectedMarker.estado}
+                    {selectedMarker.estado === 'Pendiente' && '🔴 '}
+                    {selectedMarker.estado === 'Atendido' && '🟠 '}
+                    {selectedMarker.estado === 'Cerrado' && '🟢 '}
+                    {selectedMarker.estado === 'Atendido'
+                      ? 'Atendiendo'
+                      : selectedMarker.estado}
                   </span>
                 </div>
 
@@ -251,12 +789,290 @@ export default function IncidentMap({
                 </p>
 
                 <p className="text-xs text-gray-500">
-                  🕐 {formatDate(selectedMarker.fecha)}
+                  🕐 {formatDate(selectedMarker)}
                 </p>
               </div>
             </InfoWindow>
           )}
+
+        {/* InfoWindow cámara */}
+        {selectedCamera && (
+          <InfoWindow
+            position={{
+              lat: selectedCamera.latitud,
+              lng: selectedCamera.longitud,
+            }}
+            onCloseClick={() => setSelectedCamera(null)}
+          >
+            <div className="min-w-[220px] bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+              <div className="bg-slate-50 px-4 py-2.5 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-4 h-4 text-slate-600"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+
+                  <h3 className="font-semibold text-sm text-gray-800 truncate">
+                    {selectedCamera.nombre}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="relative flex h-2.5 w-2.5">
+                    {selectedCamera.estado_conectividad === 'Activa' && (
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    )}
+
+                    <span
+                      className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                        selectedCamera.estado_conectividad === 'Activa'
+                          ? 'bg-green-500'
+                          : 'bg-red-400'
+                      }`}
+                    />
+                  </span>
+
+                  <span className="text-xs font-medium text-gray-700">
+                    {selectedCamera.estado_conectividad}
+                  </span>
+                </div>
+              </div>
+
+              {isAdmin && (
+                <div className="flex gap-2 px-4 pb-3">
+                  <button
+                    onClick={() => handleEditCamera(selectedCamera)}
+                    className="flex-1 py-1.5 px-3 bg-uta-navy text-white text-xs font-bold rounded hover:bg-uta-navy/90 transition"
+                  >
+                    Editar
+                  </button>
+
+                  <button
+                    onClick={() => setCameraToDelete(selectedCamera)}
+                    className="flex-1 py-1.5 px-3 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              )}
+            </div>
+          </InfoWindow>
+        )}
+
+        {/* Ubicación actual del usuario */}
+        {status === 'success' && location && (
+          <>
+            {location.accuracy && location.accuracy < 200 && (
+              <Circle
+                center={{
+                  lat: location.lat,
+                  lng: location.lng,
+                }}
+                radius={Math.min(location.accuracy, 50)}
+                options={{
+                  strokeColor: '#4285F4',
+                  strokeOpacity: 0.4,
+                  strokeWeight: 1,
+                  fillColor: '#4285F4',
+                  fillOpacity: 0.08,
+                  zIndex: 5,
+                }}
+              />
+            )}
+
+            <Marker
+              position={{
+                lat: location.lat,
+                lng: location.lng,
+              }}
+              title="Tu ubicación actual"
+              icon={userIconUrl}
+              zIndex={20}
+            />
+          </>
+        )}
       </GoogleMap>
+
+      {/* Modal crear cámara */}
+      {newCameraCoords && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden animate-fade-in">
+            <div className="bg-uta-navy px-5 py-3">
+              <h3 className="text-white font-bold text-sm">
+                Nueva Cámara de Seguridad
+              </h3>
+              <p className="text-white/70 text-xs mt-0.5">
+                Lat: {newCameraCoords.lat.toFixed(6)}, Lng:{' '}
+                {newCameraCoords.lng.toFixed(6)}
+              </p>
+            </div>
+
+            <div className="p-5">
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                Nombre de la cámara
+              </label>
+
+              <input
+                type="text"
+                value={cameraName}
+                onChange={(event) => setCameraName(event.target.value)}
+                placeholder="Ej: Cámara Entrada Principal"
+                className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm focus:border-uta-navy focus:outline-none focus:ring-2 focus:ring-uta-navy/20 transition"
+                autoFocus
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && cameraName.trim()) {
+                    void handleCreateCamera()
+                  }
+                }}
+              />
+            </div>
+
+            <div className="flex gap-2 px-5 pb-5">
+              <button
+                onClick={handleCancelCamera}
+                className="flex-1 py-2.5 px-4 border-2 border-gray-300 text-gray-700 text-sm font-bold rounded-lg hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={() => void handleCreateCamera()}
+                disabled={!cameraName.trim() || isCreating}
+                className="flex-1 py-2.5 px-4 bg-uta-navy text-white text-sm font-bold rounded-lg hover:bg-uta-navy/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {isCreating ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar cámara */}
+      {editingCamera && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden animate-fade-in">
+            <div className="bg-uta-navy px-5 py-3">
+              <h3 className="text-white font-bold text-sm">Editar Cámara</h3>
+              <p className="text-white/70 text-xs mt-0.5">
+                ID: {editingCamera.id}
+              </p>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Nombre de la cámara
+                </label>
+
+                <input
+                  type="text"
+                  value={editCameraName}
+                  onChange={(event) => setEditCameraName(event.target.value)}
+                  placeholder="Ej: Cámara Entrada Principal"
+                  className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm focus:border-uta-navy focus:outline-none focus:ring-2 focus:ring-uta-navy/20 transition"
+                  autoFocus
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && editCameraName.trim()) {
+                      void handleUpdateCamera()
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Estado de conectividad
+                </label>
+
+                <select
+                  value={editCameraStatus}
+                  onChange={(event) =>
+                    setEditCameraStatus(
+                      event.target.value as 'Activa' | 'Inactiva'
+                    )
+                  }
+                  className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm focus:border-uta-navy focus:outline-none focus:ring-2 focus:ring-uta-navy/20 transition bg-white"
+                >
+                  <option value="Activa">Activa</option>
+                  <option value="Inactiva">Inactiva</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-2 px-5 pb-5">
+              <button
+                onClick={handleCancelEdit}
+                className="flex-1 py-2.5 px-4 border-2 border-gray-300 text-gray-700 text-sm font-bold rounded-lg hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={() => void handleUpdateCamera()}
+                disabled={!editCameraName.trim() || isUpdating}
+                className="flex-1 py-2.5 px-4 bg-uta-navy text-white text-sm font-bold rounded-lg hover:bg-uta-navy/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {isUpdating ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmar eliminación */}
+      {cameraToDelete && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden animate-fade-in">
+            <div className="bg-red-600 px-5 py-3">
+              <h3 className="text-white font-bold text-sm">
+                Eliminar Cámara
+              </h3>
+            </div>
+
+            <div className="p-5">
+              <p className="text-sm text-gray-700">
+                ¿Estás seguro de que deseas eliminar la cámara{' '}
+                <strong className="text-gray-900">
+                  "{cameraToDelete.nombre}"
+                </strong>
+                ?
+              </p>
+
+              <p className="text-xs text-gray-500 mt-2">
+                Esta acción no se puede deshacer.
+              </p>
+            </div>
+
+            <div className="flex gap-2 px-5 pb-5">
+              <button
+                onClick={handleCancelDelete}
+                className="flex-1 py-2.5 px-4 border-2 border-gray-300 text-gray-700 text-sm font-bold rounded-lg hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={() => void handleDeleteCamera(cameraToDelete)}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 px-4 bg-red-600 text-white text-sm font-bold rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {isDeleting ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -23,6 +23,12 @@ function sendToGuards(payload) {
   broadcast(payload, (meta) => meta.role === 'guard')
 }
 
+function sendToTrustedGroup(payload, targetUserIds) {
+  broadcast(payload, (meta) =>
+    meta.role === 'affected' && targetUserIds.includes(String(meta.userId))
+  )
+}
+
 function registerClient(ws, message) {
   const { role, userId } = message
 
@@ -52,7 +58,7 @@ function registerClient(ws, message) {
 }
 
 function handleIncidentCreated(ws, message) {
-  const { incident } = message
+  const { incident, trustedGroupUserIds } = message
 
   if (!incident || !incident.id) {
     send(ws, {
@@ -62,10 +68,29 @@ function handleIncidentCreated(ws, message) {
     return
   }
 
+  // Broadcast NEW_INCIDENT to all guards (never modified)
   sendToGuards({
     type: 'NEW_INCIDENT',
     incident,
   })
+
+  // Separate block: alert trusted group members only
+  // DEFENSIVE: Exclude the victim from receiving their own alert
+  if (trustedGroupUserIds && trustedGroupUserIds.length > 0) {
+    const victimId = String(incident.usuario_id || incident.userId || '')
+    const filteredIds = trustedGroupUserIds.filter(
+      (uid) => String(uid) !== victimId && String(uid) !== String(incident.id)
+    )
+
+    if (filteredIds.length > 0) {
+      sendToTrustedGroup({
+        type: 'TRUSTED_GROUP_ALERT',
+        incidentId: incident.id,
+        victimName: incident.victimName || 'Un contacto',
+        location: incident.ubicacion || 'Ubicación no especificada',
+      }, filteredIds)
+    }
+  }
 }
 
 function handleIncidentTaken(ws, message) {
@@ -152,7 +177,6 @@ function handleIncidentUpdated(ws, message) {
     guardId,
   }
 
-  console.log('[WS] Broadcasting INCIDENT_UPDATED', broadcastPayload)
   broadcast(broadcastPayload)
 }
 

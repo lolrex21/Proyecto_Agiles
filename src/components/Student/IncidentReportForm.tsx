@@ -7,11 +7,13 @@ import {
   type FormEvent,
 } from 'react'
 import Toast from '../Toast'
+import { getZoneByPoint } from '../../services/polygonService'
 import { supabase } from '../../services/supabaseClient'
 import { getCurrentUser } from '../../services/authService'
 import { emergencySocket } from '../../services/emergencySocket'
-import { getUserTrustGroups, notifyGroupMembers } from '../../services/trustGroupService'
+import { getUserTrustGroups, getGroupMembers, notifyGroupMembers } from '../../services/trustGroupService'
 import { useEmergencySocket } from '../../hooks/useEmergencySocket'
+import { useAudioAlert } from '../../hooks/useAudioAlert'
 
 type IncidentType =
   | ''
@@ -80,7 +82,7 @@ function getCurrentLocation(): Promise<CurrentLocation> {
         }
         reject(new Error('No se pudo obtener tu ubicación actual.'))
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     )
   })
 }
@@ -98,6 +100,8 @@ export default function IncidentReportForm() {
   const [isHolding, setIsHolding] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' } | null>(null)
   const [activeIncidentId, setActiveIncidentId] = useState<number | null>(null)
+
+  const { playAlert: playTrustedAlert } = useAudioAlert()
 
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const animationFrameRef = useRef<number | null>(null)
@@ -143,13 +147,14 @@ export default function IncidentReportForm() {
     try {
       const user = getCurrentUser()
       const location = await getCurrentLocation()
+      const zone = await getZoneByPoint(location.latitud, location.longitud)
 
       const { data: newIncident, error } = await supabase
         .from('incidentes')
         .insert([
           {
             usuario_id: user?.id || null,
-            zona_id: null,
+            zona_id: zone?.id || null,    
             tipo_incidente: 'otro',
             descripcion: 'Emergencia reportada (sin detalles aún)',
             estado: 'Pendiente',
@@ -167,13 +172,20 @@ export default function IncidentReportForm() {
       }
 
       setActiveIncidentId(Number(newIncident.id))
-      emergencySocket.createIncident(newIncident)
 
-      // Notificar a los grupos de confianza
+      // Collect trusted group member IDs for real-time WS notification
+      let trustedGroupUserIds: string[] = []
       if (user?.id) {
         const userId = Number(user.id)
         const groups = await getUserTrustGroups(userId)
         for (const group of groups) {
+          const members = await getGroupMembers(group.id)
+          members.forEach((member) => {
+            if (String(member.usuario_id) !== String(userId)) {
+              trustedGroupUserIds.push(String(member.usuario_id))
+            }
+          })
+
           await notifyGroupMembers(
             Number(group.id),
             Number(newIncident.id),
@@ -182,6 +194,11 @@ export default function IncidentReportForm() {
           )
         }
       }
+
+      emergencySocket.createIncident(
+        { ...newIncident, victimName: user?.nombre || 'Un usuario' },
+        trustedGroupUserIds
+      )
 
       setStatusMessage(
         'Emergencia enviada. El guardia ya fue alertado con tu ubicación. Si quieres, agrega detalles abajo.'
@@ -336,10 +353,26 @@ export default function IncidentReportForm() {
     [activeIncidentId, resetAll]
   )
 
+  const handleTrustedGroupAlert = useCallback(
+    (payload: any) => {
+      const nombre = payload.victimName || 'Un contacto'
+      const ubicacion = payload.location
+
+      setToast({
+        message: `⚠️ ALERTA DE CONFIANZA: ${nombre} ha reportado un incidente en la ubicación: ${ubicacion || 'Ubicación no especificada'}`,
+        type: 'info',
+      })
+      playTrustedAlert()
+      setTimeout(() => setToast(null), 6000)
+    },
+    [playTrustedAlert]
+  )
+
   useEmergencySocket({
     role: 'affected',
     userId: String(getCurrentUser()?.id ?? ''),
     onIncidentUpdated: handleIncidentUpdated,
+    onTrustedGroupAlert: handleTrustedGroupAlert,
   })
 
   // ----- Vista: formulario de detalles (emergencia ya enviada) -----
