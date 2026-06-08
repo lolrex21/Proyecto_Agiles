@@ -556,14 +556,17 @@ export default function GuardDashboard() {
               </div>
             </div>
 
-            <div className="panel-alerts-info">
-              <h2>Alertas activas</h2>
-              <p>{activeIncidents.length} incidente(s)</p>
-              {activeIncidents.length > 0 && (
-                <span className="alert-badge">{activeIncidents.length}</span>
-              )}
-            </div>
-          </div>
+              <div className="map-wrapper">
+                <IncidentMap
+                  incidents={visibleIncidents}
+                  loading={loading}
+                  onMarkerClick={setSelectedIncident}
+                  isAdmin={user?.rol === 'administrador'}
+                />
+                <ZoneLegend zones={zones} />
+              </div>
+            </article>
+          )}
 
           <span className="collapsed-label">{activeIncidents.length} alertas</span>
 
