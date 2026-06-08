@@ -129,3 +129,63 @@ export const updateIncidentZone = async (
   }
   return true
 }
+// ============================================================
+// A-12: PUESTOS DE GUARDIA
+// ============================================================
+
+export interface GuardPost {
+  id: number
+  nombre: string
+  descripcion?: string
+  lat: number
+  lng: number
+}
+
+// Coordenadas hardcodeadas como respaldo rápido
+// (también se cargan de Supabase vía getGuardPostsFromDB)
+export const GUARD_POSTS_LOCAL: GuardPost[] = [
+  { id: 1, nombre: 'Puesto de Guardia 1 – Entrada Principal',  lat: -1.270662, lng: -78.624326 },
+  { id: 2, nombre: 'Puesto de Guardia 2 – Facultad Ingeniería', lat: -1.268654, lng: -78.625860 },
+  { id: 3, nombre: 'Puesto de Guardia 3 – Zona Central',        lat: -1.268250, lng: -78.625761 },
+  { id: 4, nombre: 'Puesto de Guardia 4 – Campus Occidental',   lat: -1.266477, lng: -78.644764 },
+]
+
+/** Carga los puestos de guardia desde Supabase (zona_tipo = 'puesto_guardia').
+ *  Cada registro tiene coordenadas = [{"lat": X, "lng": Y}] — un solo punto. */
+export const getGuardPostsFromDB = async (): Promise<GuardPost[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('zonas')
+      .select('id, nombre, descripcion, coordenadas')
+      .eq('zona_tipo', 'puesto_guardia')
+      .eq('campus', 'Huachi')
+
+    if (error || !data || data.length === 0) {
+      // Fallback: usar las coordenadas locales si la BD aún no tiene datos
+      return GUARD_POSTS_LOCAL
+    }
+
+    return data.map((z: any) => {
+      // coordenadas[0] es el punto exacto del puesto
+      const point = z.coordenadas?.[0] ?? { lat: 0, lng: 0 }
+      return {
+        id:          z.id,
+        nombre:      z.nombre,
+        descripcion: z.descripcion,
+        lat:         Number(point.lat),
+        lng:         Number(point.lng),
+      }
+    })
+  } catch {
+    return GUARD_POSTS_LOCAL
+  }
+}
+
+/** Calcula el centroide de un polígono (para pan/zoom al hacer clic) */
+export const getPolygonCenter = (
+  coords: CoordinatesPoint[]
+): CoordinatesPoint => {
+  const lat = coords.reduce((s, c) => s + c.lat, 0) / coords.length
+  const lng = coords.reduce((s, c) => s + c.lng, 0) / coords.length
+  return { lat, lng }
+}

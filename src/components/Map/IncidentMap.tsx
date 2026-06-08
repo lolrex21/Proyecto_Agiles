@@ -1,62 +1,119 @@
 import {
   GoogleMap,
-  LoadScript,
+  useJsApiLoader,
   Marker,
   InfoWindow,
   Polygon,
+  Circle,
 } from '@react-google-maps/api'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Incident } from '../../types/incident'
 import { usePolygons } from '../../hooks/usePolygons'
-import { getZoneByPoint } from '../../services/polygonService'
+import { useUserLocation } from '../../hooks/useUserLocation'
+import {
+  getZoneByPoint,
+  getPolygonCenter,
+  getGuardPostsFromDB,
+  type ZonePolygon,
+  type GuardPost,
+} from '../../services/polygonService'
+import './IncidentMap.css'
 
+// ─── Props ────────────────────────────────────────────────────
 interface IncidentMapProps {
-  incidents: Incident[]
-  loading: boolean
-  onMarkerClick?: (incident: Incident) => void
+  incidents:           Incident[]
+  loading:             boolean
+  onMarkerClick?:      (incident: Incident) => void
+  onLocationDetected?: (lat: number, lng: number) => void
 }
 
-const mapContainerStyle = {
-  width: '100%',
-  height: '100%',
+const mapContainerStyle = { width: '100%', height: '100%' }
+const defaultCenter     = { lat: -1.2685, lng: -78.6245 }
+const defaultZoom       = 17
+
+// ── Icono SVG escudo (puestos de guardia) ─────────────────────
+const GUARD_ICON_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">' +
+  '<circle cx="20" cy="20" r="18" fill="#1a56db" stroke="#ffffff" stroke-width="3"/>' +
+  '<path d="M20 8 L28 12 L28 22 C28 27 20 32 20 32 C20 32 12 27 12 22 L12 12 Z" fill="#ffffff" fill-opacity="0.9"/>' +
+  '<path d="M17 20 L19 22 L23 17" stroke="#1a56db" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
+  '</svg>'
+const guardIconUrl = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(GUARD_ICON_SVG)}`
+
+// ── Icono SVG punto azul (ubicación del usuario) ──────────────
+const USER_ICON_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">' +
+  '<circle cx="20" cy="20" r="14" fill="#4285F4" stroke="#ffffff" stroke-width="4"/>' +
+  '<circle cx="20" cy="20" r="5" fill="#ffffff"/>' +
+  '</svg>'
+const userIconUrl = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(USER_ICON_SVG)}`
+
+// ─── Colores de incidente ─────────────────────────────────────
+const INCIDENT_COLORS: Record<string, string> = {
+  robo:       '#FF0000',
+  agresion:   '#FF6600',
+  vandalismo: '#FFAA00',
+  sospechoso: '#9900FF',
+  accidente:  '#0066FF',
+  incendio:   '#FF3300',
+  otro:       '#666666',
 }
+const getIncidentColor = (tipo: string) =>
+  INCIDENT_COLORS[tipo.toLowerCase()] ?? INCIDENT_COLORS.otro
 
-// Centro del Campus Huachi
-const defaultCenter = {
-  lat: -1.2685,
-  lng: -78.6245,
-}
-
-const defaultZoom = 17
-
+// ─────────────────────────────────────────────────────────────
 export default function IncidentMap({
   incidents,
   loading,
   onMarkerClick,
+  onLocationDetected,
 }: IncidentMapProps) {
-  const [selectedMarker, setSelectedMarker] = useState<Incident | null>(null)
-  const { zones } = usePolygons()
-  const [incidentsWithZone, setIncidentsWithZone] = useState<Incident[]>([])
+  const mapRef = useRef<google.maps.Map | null>(null)
 
-  // 🎯 ASIGNAR ZONA A CADA INCIDENTE AUTOMÁTICAMENTE
+  const [selectedMarker,    setSelectedMarker]    = useState<Incident | null>(null)
+  const [selectedGuardPost, setSelectedGuardPost] = useState<GuardPost | null>(null)
+  const [hoveredZone,       setHoveredZone]       = useState<ZonePolygon | null>(null)
+  const [incidentsWithZone, setIncidentsWithZone] = useState<Incident[]>([])
+  const [guardPosts,        setGuardPosts]        = useState<GuardPost[]>([])
+
+  // ── Carga la API de Google Maps UNA SOLA VEZ (no se remonta al re-renderizar) ──
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string,
+    id: 'google-map-script',
+  })
+
+  // A-18: hook de ubicación del usuario
+  const { location, status, errorMsg, requestLocation, startWatching, stopWatching } = useUserLocation()
+
+  const { zones } = usePolygons()
+
+  // ── Cargar puestos de guardia ─────────────────────────────
   useEffect(() => {
+    getGuardPostsFromDB().then(setGuardPosts)
+  }, [])
+
+  // ── Iniciar seguimiento continuo al montar ────────────────
+  useEffect(() => {
+    startWatching()
+    return () => stopWatching()
+  }, [startWatching, stopWatching])
+
+  // ── Asignar zona a cada incidente automáticamente ─────────
+  useEffect(() => {
+    if (incidents.length === 0) { setIncidentsWithZone([]); return }
+
     const assignZones = async () => {
       const updated = await Promise.all(
         incidents.map(async (incident) => {
-          if (
-            incident.latitud &&
-            incident.longitud &&
-            !incident.zona_id
-          ) {
+          if (incident.latitud && incident.longitud && !incident.zona_id) {
             const zone = await getZoneByPoint(
               Number(incident.latitud),
               Number(incident.longitud)
             )
-
             return {
               ...incident,
               zona_id: zone?.id,
-              zona: zone ? { id: zone.id, nombre: zone.nombre } : undefined,
+              zona:    zone ? { id: zone.id, nombre: zone.nombre } : undefined,
             }
           }
           return incident
@@ -65,171 +122,278 @@ export default function IncidentMap({
       setIncidentsWithZone(updated)
     }
 
-    if (incidents.length > 0) {
-      assignZones()
-    }
+    assignZones()
   }, [incidents])
 
+  // ── A-18.3 + A-18.4: cuando se obtiene ubicación, centrar mapa y notificar ──
+  useEffect(() => {
+    if (status === 'success' && location && mapRef.current) {
+      mapRef.current.panTo({ lat: location.lat, lng: location.lng })
+      mapRef.current.setZoom(19)
+      onLocationDetected?.(location.lat, location.lng)
+    } else if (status === 'success' && location) {
+    // Solo notifica al padre sin mover el mapa
+    onLocationDetected?.(location.lat, location.lng)
+  }
+  }, [status, location, onLocationDetected])
+
+  const onMapLoad = useCallback((map: google.maps.Map) => {
+    mapRef.current = map
+  }, [])
+
+  // ── Handlers de clic ──────────────────────────────────────
   const handleMarkerClick = (incident: Incident) => {
+    setSelectedGuardPost(null)
     setSelectedMarker(incident)
-    if (onMarkerClick) {
-      onMarkerClick(incident)
+    if (mapRef.current) {
+      mapRef.current.panTo({ lat: Number(incident.latitud), lng: Number(incident.longitud) })
+      mapRef.current.setZoom(21)
+    }
+    onMarkerClick?.(incident)
+  }
+
+  const handleZoneClick = (zone: ZonePolygon) => {
+    setSelectedMarker(null)
+    setSelectedGuardPost(null)
+    if (mapRef.current && zone.coordenadas.length > 0) {
+      mapRef.current.panTo(getPolygonCenter(zone.coordenadas))
+      mapRef.current.setZoom(20)
     }
   }
 
-  // 🎨 COLORES POR TIPO DE INCIDENTE
-  const getIncidentColor = (tipo: string): string => {
-    const colors: Record<string, string> = {
-      robo: '#FF0000',
-      agresion: '#FF6600',
-      vandalismo: '#FFAA00',
-      sospechoso: '#9900FF',
-      accidente: '#0066FF',
-      incendio: '#FF3300',
-      otro: '#666666',
+  const handleGuardPostClick = (post: GuardPost) => {
+    setSelectedMarker(null)
+    setSelectedGuardPost(post)
+    if (mapRef.current) {
+      mapRef.current.panTo({ lat: post.lat, lng: post.lng })
+      mapRef.current.setZoom(20)
     }
-    return colors[tipo.toLowerCase()] || colors.otro
   }
 
-  if (loading) {
+  // ── Guards de carga ───────────────────────────────────────
+  if (loadError) {
     return (
-      <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
-        ⏳ Cargando mapa...
+      <div className="w-full h-full bg-gray-200 flex items-center justify-center text-red-600">
+        ❌ Error al cargar Google Maps. Verifica tu API key.
       </div>
     )
   }
 
-  const incidentsWithLocation = incidentsWithZone.filter((incident) => {
-    const lat = Number(incident.latitud)
-    const lng = Number(incident.longitud)
-    return !Number.isNaN(lat) && !Number.isNaN(lng)
+  if (!isLoaded || loading) {
+    return (
+      <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+        <div className="map-loader">
+          <div className="spinner" />
+          <p>Cargando mapa...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Filtrar incidentes cerrados ───────────────────────────
+  const incidentsOnMap = incidentsWithZone.filter((inc) => {
+    const lat = Number(inc.latitud)
+    const lng = Number(inc.longitud)
+    return !Number.isNaN(lat) && !Number.isNaN(lng) && inc.estado !== 'Cerrado'
   })
+
+  // ── Botón de ubicación: título ────────────────────────────
+  const locationBtnTitle =
+    status === 'loading' ? 'Obteniendo ubicación…' :
+    status === 'success' ? 'Centrar en mi ubicación' :
+    status === 'denied'  ? 'Permiso denegado' :
+    'Mostrar mi ubicación'
 
   return (
     <div className="w-full h-full rounded-lg overflow-hidden relative bg-gray-100">
-      {incidentsWithLocation.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/80">
-          <p className="text-gray-600 text-lg">✓ No hay incidentes en el Campus Huachi</p>
+
+      {/* ── Chip de zona al hover ─────────────────────────── */}
+      {hoveredZone && (
+        <div className="zone-hover-chip">
+          <span className="zone-hover-swatch" style={{ backgroundColor: hoveredZone.color }} />
+          <span className="zone-hover-text">
+            <strong>{hoveredZone.nombre}</strong>
+            {hoveredZone.descripcion && <small>{hoveredZone.descripcion}</small>}
+          </span>
         </div>
       )}
 
-      <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          center={defaultCenter}
-          zoom={defaultZoom}
-          options={{
-            mapTypeControl: true,
-            streetViewControl: false,
-            fullscreenControl: true,
-            zoomControl: true,
-          }}
-        >
-          {/* ========== DIBUJAR POLÍGONOS DE LAS 4 ZONAS ========== */}
-          {zones.map((zone) => (
-            <Polygon
-              key={zone.id}
-              paths={zone.coordenadas}
-              options={{
-                strokeColor: zone.color,
-                strokeOpacity: 0.9,
-                strokeWeight: 3,
-                fillColor: zone.color,
-                fillOpacity: 0.12,
-              }}
-            />
-          ))}
+      {/* ── Botón flotante "Mi ubicación" ─────────────────── */}
+      <button
+        className={`location-fab${status === 'loading' ? ' loading' : ''}${status === 'denied' || status === 'error' ? ' error' : ''}${status === 'success' ? ' active' : ''}`}
+        onClick={requestLocation}
+        title={locationBtnTitle}
+        disabled={status === 'loading'}
+      >
+        {status === 'loading'
+          ? <span className="location-fab-spinner" />
+          : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+              <circle cx="12" cy="12" r="8" strokeDasharray="2 3"/>
+            </svg>
+          )
+        }
+      </button>
 
-          {/* ========== DIBUJAR MARCADORES DE INCIDENTES ========== */}
-          {incidentsWithLocation.map((incident) => (
-            <Marker
-              key={incident.id}
-              position={{
-                lat: Number(incident.latitud),
-                lng: Number(incident.longitud),
-              }}
-              title={incident.tipo_incidente}
-              icon={{
-                path: 'M 0,-1 A 1,1 0 0,1 0,1 A 1,1 0 0,1 0,-1',
-                fillColor: getIncidentColor(incident.tipo_incidente),
-                fillOpacity: 1,
-                strokeColor: '#fff',
-                strokeWeight: 2.5,
-                scale: 11,
-              }}
-              onClick={() => handleMarkerClick(incident)}
-            />
-          ))}
+      {/* ── Toast de error de ubicación ───────────────────── */}
+      {(status === 'denied' || status === 'error') && errorMsg && (
+        <div className="location-error-toast">
+          <span>⚠️ {errorMsg}</span>
+        </div>
+      )}
 
-          {/* ========== INFO WINDOW CON INFORMACIÓN CLARA ========== */}
-          {selectedMarker &&
-            Number(selectedMarker.latitud) &&
-            Number(selectedMarker.longitud) && (
-              <InfoWindow
-                position={{
-                  lat: Number(selectedMarker.latitud),
-                  lng: Number(selectedMarker.longitud),
+      {/* ── GoogleMap SIN LoadScript ──────────────────────── */}
+      <GoogleMap
+        mapContainerStyle={mapContainerStyle}
+        center={defaultCenter}
+        zoom={defaultZoom}
+        onLoad={onMapLoad}
+        options={{
+          mapTypeControl:    true,
+          streetViewControl: false,
+          fullscreenControl: true,
+          zoomControl:       true,
+        }}
+      >
+        {/* ══ POLÍGONOS DE ZONAS ══ */}
+        {zones.map((zone) => (
+          <Polygon
+            key={zone.id}
+            paths={zone.coordenadas}
+            options={{
+              strokeColor:   zone.color,
+              strokeOpacity: 0.9,
+              strokeWeight:  3,
+              fillColor:     zone.color,
+              fillOpacity:   hoveredZone?.id === zone.id ? 0.28 : 0.12,
+            }}
+            onMouseOver={() => setHoveredZone(zone)}
+            onMouseOut={()  => setHoveredZone(null)}
+            onClick={()     => handleZoneClick(zone)}
+          />
+        ))}
+
+        {/* ══ PUESTOS DE GUARDIA ══ */}
+        {guardPosts.map((post) => (
+          <Marker
+            key={`guard-${post.id}`}
+            position={{ lat: post.lat, lng: post.lng }}
+            title={post.nombre}
+            icon={guardIconUrl}
+            zIndex={10}
+            onClick={() => handleGuardPostClick(post)}
+          />
+        ))}
+
+        {/* InfoWindow puesto de guardia */}
+        {selectedGuardPost && (
+          <InfoWindow
+            position={{ lat: selectedGuardPost.lat, lng: selectedGuardPost.lng }}
+            onCloseClick={() => setSelectedGuardPost(null)}
+          >
+            <div className="p-3 max-w-xs">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xl">🛡️</span>
+                <h3 className="font-bold text-sm text-gray-900">{selectedGuardPost.nombre}</h3>
+              </div>
+              {selectedGuardPost.descripcion && (
+                <p className="text-xs text-gray-500">{selectedGuardPost.descripcion}</p>
+              )}
+              <p className="text-xs text-blue-600 mt-1 font-semibold">Puesto de Seguridad Activo</p>
+            </div>
+          </InfoWindow>
+        )}
+
+        {/* ══ MARCADORES DE INCIDENTES ══ */}
+        {incidentsOnMap.map((incident) => (
+          <Marker
+            key={incident.id}
+            position={{ lat: Number(incident.latitud), lng: Number(incident.longitud) }}
+            title={incident.tipo_incidente}
+            icon={{
+              path:         'M 0,-1 A 1,1 0 0,1 0,1 A 1,1 0 0,1 0,-1',
+              fillColor:    getIncidentColor(incident.tipo_incidente),
+              fillOpacity:  1,
+              strokeColor:  '#fff',
+              strokeWeight: 2.5,
+              scale:        11,
+            }}
+            onClick={() => handleMarkerClick(incident)}
+          />
+        ))}
+
+        {/* InfoWindow incidente */}
+        {selectedMarker && Number(selectedMarker.latitud) && Number(selectedMarker.longitud) && (
+          <InfoWindow
+            position={{ lat: Number(selectedMarker.latitud), lng: Number(selectedMarker.longitud) }}
+            onCloseClick={() => setSelectedMarker(null)}
+          >
+            <div className="p-4 max-w-sm bg-white rounded-lg">
+              <h3 className="font-bold text-base mb-2 uppercase text-gray-900">
+                {selectedMarker.tipo_incidente}
+              </h3>
+
+              {selectedMarker.zona_id != null && (
+                <p className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
+                  📍 {zones.find((z) => z.id === selectedMarker.zona_id)?.nombre || 'Zona desconocida'}
+                </p>
+              )}
+
+              <div className="mb-2">
+                <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${
+                  selectedMarker.estado === 'Pendiente' ? 'bg-red-200 text-red-900'
+                  : selectedMarker.estado === 'Atendido' ? 'bg-yellow-200 text-yellow-900'
+                  : 'bg-green-200 text-green-900'
+                }`}>
+                  {selectedMarker.estado === 'Pendiente' && '🔴 '}
+                  {selectedMarker.estado === 'Atendido'  && '🟠 '}
+                  {selectedMarker.estado === 'Cerrado'   && '🟢 '}
+                  {selectedMarker.estado}
+                </span>
+              </div>
+
+              <p className="text-sm text-gray-700 mb-2 border-t pt-2">{selectedMarker.descripcion}</p>
+              <p className="text-xs text-gray-600 mb-1">
+                👤 <strong>Reportado por:</strong> {selectedMarker.usuario?.nombre || 'Usuario'}
+              </p>
+              <p className="text-xs text-gray-500">
+                🕐 {selectedMarker.created_at
+                  ? new Date(selectedMarker.created_at).toLocaleString('es-ES')
+                  : 'Fecha no disponible'}
+              </p>
+            </div>
+          </InfoWindow>
+        )}
+
+        {/* ══ MARCADOR + CÍRCULO DE PRECISIÓN (ubicación del usuario) ══ */}
+        {status === 'success' && location && (
+          <>
+            {location.accuracy && location.accuracy < 200 && (
+              <Circle
+                center={{ lat: location.lat, lng: location.lng }}
+                radius={Math.min(location.accuracy, 50)}
+                options={{
+                  strokeColor:   '#4285F4',
+                  strokeOpacity: 0.4,
+                  strokeWeight:  1,
+                  fillColor:     '#4285F4',
+                  fillOpacity:   0.08,
+                  zIndex:        5,
                 }}
-                onCloseClick={() => setSelectedMarker(null)}
-              >
-                <div className="p-4 max-w-sm bg-white rounded-lg">
-                  {/* Tipo de incidente - Título grande */}
-                  <h3 className="font-bold text-base mb-2 uppercase text-gray-900">
-                    {selectedMarker.tipo_incidente}
-                  </h3>
-
-                  {/* Zona - Información importante */}
-                  {selectedMarker.zona_id != null && (
-                    <p className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
-                      📍{' '}
-                      {zones.find((z) => z.id === selectedMarker.zona_id)
-                        ?.nombre || 'Zona desconocida'}
-                    </p>
-                  )}
-
-                  {/* Estado - Badge coloreado */}
-                  <div className="mb-2">
-                    <span
-                      className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${
-                        selectedMarker.estado === 'Pendiente'
-                          ? 'bg-red-200 text-red-900'
-                          : selectedMarker.estado === 'Atendido'
-                          ? 'bg-yellow-200 text-yellow-900'
-                          : 'bg-green-200 text-green-900'
-                      }`}
-                    >
-                      {selectedMarker.estado === 'Pendiente' && '🔴'}{' '}
-                      {selectedMarker.estado === 'Atendido' && '🟠'}{' '}
-                      {selectedMarker.estado === 'Cerrado' && '🟢'}{' '}
-                      {selectedMarker.estado}
-                    </span>
-                  </div>
-
-                  {/* Descripción */}
-                  <p className="text-sm text-gray-700 mb-2 border-t pt-2">
-                    {selectedMarker.descripcion}
-                  </p>
-
-                  {/* Reportado por */}
-                  <p className="text-xs text-gray-600 mb-1">
-                    👤 <strong>Reportado por:</strong>{' '}
-                    {selectedMarker.usuario?.nombre || 'Usuario'}
-                  </p>
-
-                  {/* Fecha y hora */}
-                  <p className="text-xs text-gray-500">
-                    🕐{' '}
-                    {selectedMarker.created_at
-                      ? new Date(selectedMarker.created_at).toLocaleString(
-                          'es-ES'
-                        )
-                      : 'Fecha no disponible'}
-                  </p>
-                </div>
-              </InfoWindow>
+              />
             )}
-        </GoogleMap>
-      </LoadScript>
+            <Marker
+              position={{ lat: location.lat, lng: location.lng }}
+              title="Tu ubicación actual"
+              icon={userIconUrl}
+              zIndex={20}
+            />
+          </>
+        )}
+      </GoogleMap>
     </div>
   )
 }
