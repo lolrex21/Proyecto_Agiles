@@ -16,6 +16,7 @@ type UseEmergencySocketParams = {
   onIncidentClosed?: (payload: SocketPayload) => void
   onGuardBusy?: (payload: SocketPayload) => void
   onIncidentUpdated?: (payload: SocketPayload) => void
+  onTrustedGroupAlert?: (payload: SocketPayload) => void
 }
 
 export function useEmergencySocket({
@@ -26,6 +27,7 @@ export function useEmergencySocket({
   onIncidentClosed,
   onGuardBusy,
   onIncidentUpdated,
+  onTrustedGroupAlert,
 }: UseEmergencySocketParams) {
   const handlersRef = useRef({
     onNewIncident,
@@ -33,6 +35,7 @@ export function useEmergencySocket({
     onIncidentClosed,
     onGuardBusy,
     onIncidentUpdated,
+    onTrustedGroupAlert,
   })
 
   useEffect(() => {
@@ -42,8 +45,9 @@ export function useEmergencySocket({
       onIncidentClosed,
       onGuardBusy,
       onIncidentUpdated,
+      onTrustedGroupAlert,
     }
-  }, [onNewIncident, onIncidentTaken, onIncidentClosed, onGuardBusy, onIncidentUpdated])
+  }, [onNewIncident, onIncidentTaken, onIncidentClosed, onGuardBusy, onIncidentUpdated, onTrustedGroupAlert])
 
   useEffect(() => {
     if (!userId) return
@@ -78,6 +82,10 @@ export function useEmergencySocket({
 
         case 'INCIDENT_UPDATED':
           onIncidentUpdated?.(message)
+          break
+
+        case 'TRUSTED_GROUP_ALERT':
+          onTrustedGroupAlert?.(message)
           break
 
         default:

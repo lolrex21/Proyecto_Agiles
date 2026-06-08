@@ -85,10 +85,11 @@ class EmergencySocket {
     }
   }
 
-  createIncident(incident: any) {
+  createIncident(incident: any, trustedGroupUserIds?: string[]) {
     this.send({
       type: 'INCIDENT_CREATED',
       incident,
+      trustedGroupUserIds,
     })
   }
 

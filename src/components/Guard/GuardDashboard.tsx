@@ -5,6 +5,7 @@ import IncidentList from '../IncidentList'
 import NotificationBell from '../NotificationBell'
 import { useIncidents } from '../../hooks/useIncidents'
 import { useEmergencySocket } from '../../hooks/useEmergencySocket'
+import { useAudioAlert } from '../../hooks/useAudioAlert'
 import { emergencySocket } from '../../services/emergencySocket'
 import { supabase } from '../../services/supabaseClient'
 import { getCurrentUser, logout } from '../../services/authService'
@@ -330,24 +331,28 @@ export default function GuardDashboard() {
       })
 
       const incidentId = String(cleanIncident.id)
-      const yaConocido =
-        activeAlerts.some((i) => String(i.id) === incidentId) ||
-        incidents.some((i: any) => String(i.id) === incidentId)
 
       upsertLocalIncident(cleanIncident)
 
-      if (
-        cleanIncident.estado === 'Pendiente' &&
-        !yaConocido &&
-        'Notification' in window &&
-        Notification.permission === 'granted'
-      ) {
-        new Notification('Nueva emergencia', {
-          body: cleanIncident.descripcion || 'Se ha reportado una nueva emergencia',
+      if (cleanIncident.estado === 'Pendiente' && !alertedIncidentIds.has(incidentId)) {
+        setAlertedIncidentIds((prev) => new Set(prev).add(incidentId))
+        playAlert()
+
+        const tipo = cleanIncident.tipo_incidente || 'Emergencia'
+        const ubicacion = cleanIncident.ubicacion || 'Ubicación no especificada'
+        setAlertToast({
+          message: `ALERTA DE INCIDENTE — ${tipo} — ${ubicacion}`,
         })
+        setTimeout(() => setAlertToast(null), 5000)
+
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('Nueva emergencia', {
+            body: cleanIncident.descripcion || 'Se ha reportado una nueva emergencia',
+          })
+        }
       }
     },
-    [activeAlerts, incidents, sanitizeIncident, upsertLocalIncident]
+    [alertedIncidentIds, sanitizeIncident, upsertLocalIncident, playAlert]
   )
 
   const handleSocketIncidentTaken = useCallback(
