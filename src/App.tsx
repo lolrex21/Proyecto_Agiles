@@ -121,7 +121,7 @@ function App() {
     return <LoginForm onLogin={handleLogin} initialMessage={sessionMessage} />
   }
 
-  if (currentUser?.rol === 'guardia') {
+  if (currentUser?.rol === 'guardia' || currentUser?.rol === 'administrador') {
     return <GuardDashboard />
   }
 

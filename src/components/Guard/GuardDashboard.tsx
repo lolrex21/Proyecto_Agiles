@@ -500,6 +500,7 @@ const { zones } = usePolygons()
                   incidents={visibleIncidents}
                   loading={loading}
                   onMarkerClick={setSelectedIncident}
+                  isAdmin={user?.rol === 'administrador'}
                 />
                 <ZoneLegend zones={zones} />
               </div>
