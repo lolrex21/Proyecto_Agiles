@@ -1,18 +1,18 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import Header from '../Header'
 import SearchBar from '../SearchBar'
 import IncidentMap from '../Map/IncidentMap'
 import IncidentList from '../IncidentList'
 import Toast from '../Toast'
 import AssignedGuardsList from './AssignedGuardsList'
 import ConfirmAttendanceButton from './ConfirmAttendanceButton'
+import NotificationBell from '../NotificationBell'
 import { useIncidents } from '../../hooks/useIncidents'
 import { useEmergencySocket } from '../../hooks/useEmergencySocket'
 import { useAudioAlert } from '../../hooks/useAudioAlert'
 import { useIncidentGuards } from '../../hooks/useIncidentGuards'
 import { emergencySocket } from '../../services/emergencySocket'
 import { supabase } from '../../services/supabaseClient'
-import { getCurrentUser } from '../../services/authService'
+import { getCurrentUser, logout } from '../../services/authService'
 import './GuardDashboard.css'
 import { usePolygons } from '../../hooks/usePolygons'
 import ZoneLegend from '../Map/ZoneLegend'
@@ -30,15 +30,23 @@ export default function GuardDashboard() {
 
   const user = getCurrentUser()
   const guardId = user?.id ? String(user.id) : ''
+  const userName = user?.nombre || user?.name || 'Usuario'
+  const userEmail = user?.email || user?.correo || 'Correo no disponible'
+  const userRole = user?.rol || user?.role || user?.tipo_usuario || 'estudiante'
+  const isGuard = userRole === 'guardia' || userRole === 'guard'
 
-  const [viewMode, setViewMode] = useState<'split' | 'map' | 'list'>('split')
+  const handleLogout = async () => {
+    await logout()
+    window.location.replace('/')
+  }
+
+  const [viewMode] = useState<'split' | 'map' | 'list'>('split')
   const [activeAlerts, setActiveAlerts] = useState<any[]>([])
   const [currentIncidentId, setCurrentIncidentId] = useState<string | null>(null)
   const [confirmCloseId, setConfirmCloseId] = useState<number | null>(null)
-  const [alertToast, setAlertToast] = useState<{ message: string } | null>(null)
-  const [alertedIncidentIds, setAlertedIncidentIds] = useState<Set<string>>(new Set())
-
-  const { soundEnabled, toggleSound, playAlert } = useAudioAlert()
+  const [mapFullscreen, setMapFullscreen] = useState(false)
+  const [listCollapsed, setListCollapsed] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const guardIdNum = user?.id ? Number(user.id) : 0
   const selectedIncidentId = selectedIncident ? Number(selectedIncident.id) : null
@@ -364,136 +372,189 @@ export default function GuardDashboard() {
     [alertedIncidentIds, sanitizeIncident, upsertLocalIncident, playAlert]
   )
 
-const handleSocketIncidentTaken = useCallback(
-  ({ incidentId, guardId: assignedGuardId, incident }: any) => {
-    const normalizedIncidentId = String(incidentId)
-    const cleanIncident = sanitizeIncident({
-      ...incident,
-      estado: 'Atendido',
-      guardia_id: assignedGuardId,
-    })
+  const handleSocketIncidentTaken = useCallback(
+    ({ incidentId, guardId: assignedGuardId, incident }: any) => {
+      const normalizedIncidentId = String(incidentId)
+      const cleanIncident = sanitizeIncident({
+        ...incident,
+        estado: 'Atendido',
+        guardia_id: assignedGuardId,
+      })
 
-    upsertLocalIncident(cleanIncident)
+      upsertLocalIncident(cleanIncident)
 
-    if (String(assignedGuardId) === String(guardId)) {
-      setCurrentIncidentId(normalizedIncidentId)
-    }
+      if (String(assignedGuardId) === String(guardId)) {
+        setCurrentIncidentId(normalizedIncidentId)
+      }
 
-    setSelectedIncident((prev: any) => {
-      if (!prev || String(prev.id) !== normalizedIncidentId) return prev
-      return { ...prev, ...cleanIncident }
-    })
-  },
-  [guardId, sanitizeIncident, setSelectedIncident, upsertLocalIncident]
-)
+      setSelectedIncident((prev: any) => {
+        if (!prev || String(prev.id) !== normalizedIncidentId) return prev
+        return { ...prev, ...cleanIncident }
+      })
+    },
+    [guardId, sanitizeIncident, setSelectedIncident, upsertLocalIncident]
+  )
 
-const handleSocketIncidentClosed = useCallback(
-  ({ incidentId, incident }: any) => {
-    const normalizedIncidentId = String(incidentId)
-    const cleanIncident = sanitizeIncident({
-      ...incident,
-      estado: 'Cerrado',
-    })
+  const handleSocketIncidentClosed = useCallback(
+    ({ incidentId, incident }: any) => {
+      const normalizedIncidentId = String(incidentId)
+      const cleanIncident = sanitizeIncident({
+        ...incident,
+        estado: 'Cerrado',
+      })
 
-    upsertLocalIncident(cleanIncident)
+      upsertLocalIncident(cleanIncident)
 
-    setCurrentIncidentId((prev) =>
-      prev === normalizedIncidentId ? null : prev
-    )
+      setCurrentIncidentId((prev) =>
+        prev === normalizedIncidentId ? null : prev
+      )
 
-    setSelectedIncident((prev: any) => {
-      if (!prev || String(prev.id) !== normalizedIncidentId) return prev
-      return { ...prev, ...cleanIncident }
-    })
-  },
-  [sanitizeIncident, setSelectedIncident, upsertLocalIncident]
-)
+      setSelectedIncident((prev: any) => {
+        if (!prev || String(prev.id) !== normalizedIncidentId) return prev
+        return { ...prev, ...cleanIncident }
+      })
+    },
+    [sanitizeIncident, setSelectedIncident, upsertLocalIncident]
+  )
 
-const handleGuardBusy = useCallback((payload: any) => {
-  alert(payload.message)
-}, [])
+  const handleGuardBusy = useCallback((payload: any) => {
+    alert(payload.message)
+  }, [])
 
   useEmergencySocket({
-  role: 'guard',
-  userId: guardId,
-  onNewIncident: handleNewSocketIncident,
-  onIncidentTaken: handleSocketIncidentTaken,
-  onIncidentClosed: handleSocketIncidentClosed,
-  onGuardBusy: handleGuardBusy,
-})
+    role: 'guard',
+    userId: guardId,
+    onNewIncident: handleNewSocketIncident,
+    onIncidentTaken: handleSocketIncidentTaken,
+    onIncidentClosed: handleSocketIncidentClosed,
+    onGuardBusy: handleGuardBusy,
+  })
 
-const { zones } = usePolygons()
+  const { zones } = usePolygons()
 
   return (
     <div className="guard-dashboard">
-      <Header />
-      {alertToast && (
-        <Toast
-          message={alertToast.message}
-          type="info"
-          onClose={() => setAlertToast(null)}
-        />
-      )}
 
-      <main className="dashboard-main">
-        <section className="dashboard-toolbar">
-          <div className="dashboard-search">
-            <SearchBar onSearch={handleSearch} />
-          </div>
+      {/* ── Contenido principal: mapa full-height + panel lateral ── */}
+      <main
+        className={`dashboard-main${listCollapsed ? ' panel-collapsed' : ''}${viewMode === 'map' ? ' view-map' : ''}${viewMode === 'list' ? ' view-list' : ''}`}
+      >
+        {/* ═══ MAPA (ocupa toda la pantalla de arriba a abajo) ═══ */}
+        {viewMode !== 'list' && (
+          <section className={`map-section${mapFullscreen ? ' map-fullscreen' : ''}`}>
 
-          <div className="view-toggle compact">
-            <button
-              onClick={() => setViewMode('split')}
-              className={`toggle-btn ${viewMode === 'split' ? 'active' : ''}`}
-              title="Vista dividida"
-            >
-              Dividida
-            </button>
-
-            <button
-              onClick={() => setViewMode('map')}
-              className={`toggle-btn ${viewMode === 'map' ? 'active' : ''}`}
-              title="Ver solo mapa"
-            >
-              Mapa
-            </button>
-
-            <button
-              onClick={() => setViewMode('list')}
-              className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
-              title="Ver solo lista"
-            >
-              Lista
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 ml-4">
-            <span className="text-xs font-semibold text-gray-600">Alertas de sonido</span>
-            <button
-              onClick={toggleSound}
-              className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
-                soundEnabled ? 'bg-uta-navy' : 'bg-gray-300'
-              }`}
-              aria-label="Toggle sound alerts"
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
-                  soundEnabled ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-        </section>
-
-        <section className={`dashboard-content ${viewMode}`}>
-          {(viewMode === 'split' || viewMode === 'map') && (
-            <article className="dashboard-card map-section">
-              <div className="section-header compact-header">
-                <div>
-                  <h2>Mapa de emergencias</h2>
-                  <p>Ubicación de las alertas reportadas</p>
-                </div>
+            {/* Brand flotante sobre el mapa (esquina superior izquierda) */}
+            <div className="map-brand-overlay">
+              <div className="map-brand-icon">🛡️</div>
+              <div className="map-brand-text">
+                <span className="map-brand-title">UTA CampusSeguro</span>
+                <span className="map-brand-sub">Sistema de alertas universitarias</span>
               </div>
+            </div>
+
+            {/* Controles flotantes (esquina superior derecha del mapa) — ocultos en mobile via CSS */}
+            <div className="map-floating-controls">
+              {viewMode === 'split' && (
+                <button
+                  className={`map-floating-btn${listCollapsed ? ' active' : ''}`}
+                  onClick={() => setListCollapsed(v => !v)}
+                  title={listCollapsed ? 'Mostrar panel lateral' : 'Colapsar panel lateral'}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    {listCollapsed ? <polyline points="15 18 9 12 15 6"/> : <polyline points="9 18 15 12 9 6"/>}
+                  </svg>
+                </button>
+              )}
+              <button
+                className={`map-floating-btn${mapFullscreen ? ' active' : ''}`}
+                onClick={() => setMapFullscreen(v => !v)}
+                title={mapFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  {mapFullscreen
+                    ? <><polyline points="8 3 3 3 3 8"/><polyline points="21 8 21 3 16 3"/><polyline points="3 16 3 21 8 21"/><polyline points="16 21 21 21 21 16"/></>
+                    : <><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></>
+                  }
+                </svg>
+              </button>
+            </div>
+
+            <div className="map-wrapper">
+              <IncidentMap
+                incidents={visibleIncidents}
+                loading={loading}
+                onMarkerClick={setSelectedIncident}
+              />
+              <ZoneLegend zones={zones} />
+            </div>
+          </section>
+        )}
+
+        {/* ═══ OVERLAY – solo mobile, cierra el drawer al tocar fuera ═══ */}
+        <div
+          className={`drawer-overlay${drawerOpen ? ' visible' : ''}`}
+          onClick={() => setDrawerOpen(false)}
+        />
+
+        {/* ═══ PANEL LATERAL / BOTTOM SHEET DRAWER ═══ */}
+        <aside
+          className={[
+            'lateral-panel',
+            listCollapsed ? 'collapsed' : '',
+            drawerOpen   ? 'drawer-open' : '',
+          ].filter(Boolean).join(' ')}
+        >
+
+          {/* ── Tarjeta de usuario ── */}
+          {/* En mobile: tappable en toda la franja para abrir/cerrar el drawer */}
+          <div
+            className="panel-user-card"
+            onClick={() => setDrawerOpen(v => !v)}
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="panel-user-avatar">
+              {userName.charAt(0).toUpperCase()}
+            </div>
+            <div className="panel-user-info">
+              <span className="panel-user-role">
+                {isGuard ? 'Guardia de seguridad' : 'Estudiante'}
+              </span>
+              <strong className="panel-user-name">{userName}</strong>
+              <span className="panel-user-email">{userEmail}</span>
+              {isGuard && (
+                <span className="panel-user-zone">
+                  Zona: {user?.zona_id || 'Sin asignar'}
+                </span>
+              )}
+            </div>
+            {/* stopPropagation: campana y botón Salir no abren/cierran el drawer */}
+            <div
+              className="panel-user-actions"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <NotificationBell />
+              <button onClick={handleLogout} className="panel-logout-btn">
+                Salir
+              </button>
+            </div>
+          </div>
+
+          {/* ── Cabecera: colapsar + buscador ── */}
+          <div className="panel-header">
+            <div className="panel-top-row">
+              <button
+                className="panel-collapse-btn"
+                onClick={() => setListCollapsed(v => !v)}
+                title={listCollapsed ? 'Expandir panel' : 'Colapsar panel'}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  {listCollapsed ? <polyline points="9 18 15 12 9 6"/> : <polyline points="15 18 9 12 15 6"/>}
+                </svg>
+              </button>
+              <div className="panel-search">
+                <SearchBar onSearch={handleSearch} />
+              </div>
+            </div>
 
               <div className="map-wrapper">
                 <IncidentMap
@@ -507,29 +568,20 @@ const { zones } = usePolygons()
             </article>
           )}
 
-          {(viewMode === 'split' || viewMode === 'list') && (
-            <article className="dashboard-card list-section">
-              <div className="section-header compact-header">
-                <div>
-                  <h2>Alertas activas</h2>
-                  <p>{activeIncidents.length} incidente(s) activos</p>
-                </div>
-              </div>
+          <span className="collapsed-label">{activeIncidents.length} alertas</span>
 
-              <div className="incident-list-scroll">
-                <IncidentList
-                  incidents={activeIncidents}
-                  loading={loading}
-                  onSelect={setSelectedIncident}
-                  onStatusUpdate={handleIncidentStatusUpdate}
-                />
-              </div>
-            </article>
-          )}
-        </section>
+          <div className="incident-list-scroll">
+            <IncidentList
+              incidents={activeIncidents}
+              loading={loading}
+              onSelect={setSelectedIncident}
+              onStatusUpdate={handleIncidentStatusUpdate}
+            />
+          </div>
+        </aside>
 
         {selectedIncident && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-9999 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
               <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
                 <h3 className="text-lg font-bold text-uta-navy">
@@ -556,7 +608,7 @@ const { zones } = usePolygons()
                     <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Ubicación</span>
                   </div>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
-                    {selectedIncident.ubicacion || 'No especificada'}
+                    {selectedIncident.zona?.nombre || 'No especificada'}
                   </div>
                 </div>
 
@@ -573,6 +625,26 @@ const { zones } = usePolygons()
                   </div>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
                     {selectedIncident.descripcion}
+                  </div>
+                </div>
+
+                {/* ── Zona del incidente ── */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-uta-red"
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="3 11 22 2 13 21 11 13 3 11" />
+                    </svg>
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                      Zona del campus
+                    </span>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
+                    {selectedIncident.zona_id
+                      ? zones.find(z => z.id === selectedIncident.zona_id)?.nombre
+                        ?? `Zona #${selectedIncident.zona_id}`
+                      : 'Zona no identificada'}
                   </div>
                 </div>
 
