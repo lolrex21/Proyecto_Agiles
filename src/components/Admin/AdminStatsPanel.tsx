@@ -20,6 +20,32 @@ type AdminStatsPanelProps = {
 export default function AdminStatsPanel({ incidents }: AdminStatsPanelProps) {
   const total = incidents.length
 
+  if (total === 0) {
+    return (
+      <article className="dashboard-card stats-section admin-stats-section">
+        <div className="section-header compact-header">
+          <div>
+            <h2>Estadísticas generales</h2>
+            <p>Resumen visual de incidentes registrados, zonas críticas y tendencias del campus.</p>
+          </div>
+        </div>
+
+        <div className="admin-stats-panel">
+          <p
+            style={{
+              padding: '2rem',
+              textAlign: 'center',
+              color: '#64748b',
+              fontWeight: 600,
+            }}
+          >
+            No se encontraron incidentes con los filtros seleccionados.
+          </p>
+        </div>
+      </article>
+    )
+  }
+
   const pendientes = incidents.filter((inc) => inc.estado === 'Pendiente').length
   const atendiendo = incidents.filter((inc) => inc.estado === 'Atendido').length
   const cerrados = incidents.filter((inc) => inc.estado === 'Cerrado').length
@@ -57,6 +83,8 @@ export default function AdminStatsPanel({ incidents }: AdminStatsPanelProps) {
   const tipoData = countBy((inc) => inc.tipo_incidente || 'Sin tipo')
 
   const zonaData = countBy((inc) => inc.zona?.nombre || 'Sin zona')
+
+  const topZona = zonaData[0]?.name ?? 'Sin datos'
 
   const yearData = countBy((inc) => {
     const fecha = inc.fecha || inc.created_at
@@ -104,6 +132,11 @@ export default function AdminStatsPanel({ incidents }: AdminStatsPanelProps) {
           <div className="admin-stat-card danger">
             <span>Emergencias activas</span>
             <strong>{emergencias}</strong>
+          </div>
+
+          <div className="admin-stat-card">
+            <span>Zona más frecuente</span>
+            <strong>{topZona}</strong>
           </div>
         </div>
 

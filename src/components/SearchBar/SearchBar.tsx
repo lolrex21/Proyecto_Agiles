@@ -132,13 +132,14 @@ export default function SearchBar({ filters, zones, onChange }: SearchBarProps) 
             className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="">Todos</option>
-            <option value="Robo">Robo</option>
-            <option value="Agresión">Agresión</option>
-            <option value="Vandalismo">Vandalismo</option>
-            <option value="Sospechoso">Sospechoso</option>
-            <option value="Accidente">Accidente</option>
-            <option value="Incendio">Incendio</option>
-            <option value="Otro">Otro</option>
+            <option value="robo">Robo</option>
+            <option value="pelea">Pelea</option>
+            <option value="accidente">Accidente</option>
+            <option value="otro">Otro</option>
+            <option value="agresion">Agresión</option>
+            <option value="vandalismo">Vandalismo</option>
+            <option value="sospechoso">Sospechoso</option>
+            <option value="incendio">Incendio</option>
           </select>
         </label>
       </div>

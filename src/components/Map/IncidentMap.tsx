@@ -34,6 +34,7 @@ interface IncidentMapProps {
   onMarkerClick?: (incident: Incident) => void
   isAdmin?: boolean
   onLocationDetected?: (lat: number, lng: number) => void
+  hideCameraToggle?: boolean
 }
 
 const mapContainerStyle = {
@@ -73,13 +74,14 @@ const userIconUrl = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
 
 // ─── Colores de incidente ─────────────────────────────────────
 const INCIDENT_COLORS: Record<string, string> = {
-  robo: '#FF0000',
-  agresion: '#FF6600',
+  robo: '#FF0000', // rojo
+  pelea: '#FF7A00', // naranja
+  agresion: '#FF7A00', // naranja (sinónimo de pelea)
   vandalismo: '#FFAA00',
   sospechoso: '#9900FF',
-  accidente: '#0066FF',
+  accidente: '#0066FF', // azul
   incendio: '#FF3300',
-  otro: '#666666',
+  otro: '#666666', // gris
 }
 
 const getIncidentColor = (tipo?: string): string => {
@@ -113,6 +115,7 @@ export default function IncidentMap({
   selectedIncident = null,
   isAdmin = false,
   onLocationDetected,
+  hideCameraToggle = false,
 }: IncidentMapProps) {
   const mapRef = useRef<google.maps.Map | null>(null)
 
@@ -469,6 +472,7 @@ export default function IncidentMap({
       )}
 
       {/* Toggle para cámaras */}
+      {!hideCameraToggle && (
       <button
         onClick={() => {
           setShowCameras((prev) => !prev)
@@ -500,6 +504,7 @@ export default function IncidentMap({
           ? 'Ocultar Cámaras'
           : 'Mostrar Cámaras'}
       </button>
+      )}
 
       {/* Toggle modo añadir cámara */}
       {isAdmin && (

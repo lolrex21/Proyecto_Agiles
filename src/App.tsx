@@ -39,6 +39,7 @@ function App() {
       handled = true
 
       const result = await syncGoogleSession(session)
+
       if (!isMounted) return
 
       if (result.success) {
@@ -102,7 +103,7 @@ function App() {
   }
 
   const handleGroupCreated = () => {
-    setRefreshTrustGroups(prev => prev + 1)
+    setRefreshTrustGroups((prev) => prev + 1)
   }
 
   if (checkingSession) {
@@ -121,58 +122,72 @@ function App() {
     return <LoginForm onLogin={handleLogin} initialMessage={sessionMessage} />
   }
 
-  const currentRole = currentUser?.rol || ''
+  const currentRole = String(
+    currentUser?.rol || currentUser?.role || currentUser?.tipo_usuario || ''
+  ).toLowerCase()
 
-if (
-  currentRole.toLowerCase() === 'guardia' ||
-  currentRole.toLowerCase() === 'guard' ||
-  currentRole.toLowerCase() === 'admin' ||
-  currentRole.toLowerCase() === 'administrador'
-) {
-  return <GuardDashboard role={currentRole} />
-}
+  const isGuardOrAdmin = [
+    'guardia',
+    'guard',
+    'admin',
+    'administrador',
+  ].includes(currentRole)
+
+  if (isGuardOrAdmin) {
+    return <GuardDashboard role={currentRole} />
+  }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 flex flex-col overflow-hidden">
       <Header />
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-6 flex gap-3">
+      <main className="fixed left-0 right-0 top-[4rem] bottom-[3.8rem] mx-auto w-full max-w-6xl px-3 pt-2 overflow-hidden">
+        {activeTab === 'reportar' && (
+          <div className="h-full overflow-hidden">
+            <IncidentReportForm />
+          </div>
+        )}
+
+        {activeTab === 'grupos' && currentUser && (
+          <div className="h-full overflow-y-auto pb-4">
+            <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+              <TrustGroupForm onSuccess={handleGroupCreated} />
+
+              <TrustGroupList refreshTrigger={refreshTrustGroups} />
+            </div>
+          </div>
+        )}
+      </main>
+
+      <nav className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gray-200 shadow-[0_-2px_12px_rgba(0,0,0,0.08)] pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto max-w-6xl grid grid-cols-2">
           <button
             type="button"
             onClick={() => setActiveTab('reportar')}
-            className={`rounded-xl px-5 py-3 text-sm font-bold transition ${
+            className={`flex flex-col items-center justify-center gap-1 py-3 text-xs font-bold transition ${
               activeTab === 'reportar'
-                ? 'bg-uta-red text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
+                ? 'text-uta-red border-t-2 border-uta-red'
+                : 'text-gray-500 border-t-2 border-transparent hover:text-gray-700'
             }`}
           >
+            <span className="text-xl leading-none">🚨</span>
             Reportar emergencia
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('grupos')}
-            className={`rounded-xl px-5 py-3 text-sm font-bold transition ${
+            className={`flex flex-col items-center justify-center gap-1 py-3 text-xs font-bold transition ${
               activeTab === 'grupos'
-                ? 'bg-uta-red text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
+                ? 'text-uta-red border-t-2 border-uta-red'
+                : 'text-gray-500 border-t-2 border-transparent hover:text-gray-700'
             }`}
           >
+            <span className="text-xl leading-none">👥</span>
             Grupos de confianza
           </button>
         </div>
-
-        {activeTab === 'reportar' && <IncidentReportForm />}
-
-        {activeTab === 'grupos' && currentUser && (
-          <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
-            <TrustGroupForm onSuccess={handleGroupCreated} />
-
-            <TrustGroupList refreshTrigger={refreshTrustGroups} />
-          </div>
-        )}
-      </main>
+      </nav>
     </div>
   )
 }

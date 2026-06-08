@@ -20,17 +20,44 @@ export default function IncidentCard({
 }: IncidentCardProps) {
   const getIcon = (tipo: string) => {
     const icons: Record<string, string> = {
-      robo: '',
-      agresion: '',
-      vandalismo: '',
-      sospechoso: '',
-      accidente: '',
-      incendio: '',
-      otro: '',
+      robo: '🦹',
+      pelea: '🥊',
+      agresion: '🥊',
+      vandalismo: '🧱',
+      sospechoso: '🕵️',
+      accidente: '🚑',
+      incendio: '🔥',
+      otro: '⚠️',
     }
 
-    return icons[tipo?.toLowerCase()] || ''
+    return icons[tipo?.toLowerCase()] || '⚠️'
   }
+
+  const tipoLabels: Record<string, string> = {
+    robo: 'Robo',
+    pelea: 'Pelea',
+    agresion: 'Pelea',
+    vandalismo: 'Vandalismo',
+    sospechoso: 'Sospechoso',
+    accidente: 'Accidente',
+    incendio: 'Incendio',
+    otro: 'Otro',
+  }
+
+  const getTipoLabel = (tipo: string) =>
+    tipoLabels[tipo?.toLowerCase()] || tipo?.toUpperCase() || 'OTRO'
+
+  // Color del borde izquierdo según el tipo (alineado con el mapa)
+  const tipoBorderColors: Record<string, string> = {
+    robo: 'border-red-600',
+    pelea: 'border-orange-500',
+    agresion: 'border-orange-500',
+    accidente: 'border-blue-600',
+    otro: 'border-gray-500',
+  }
+
+  const getBorderColor = (tipo: string) =>
+    tipoBorderColors[tipo?.toLowerCase()] || 'border-red-500'
 
   const statusColors: Record<string, string> = {
     Pendiente: 'bg-red-100 text-red-800',
@@ -62,7 +89,7 @@ export default function IncidentCard({
   }
 
   return (
-    <div className="bg-white border-l-4 border-red-500 rounded p-4 mb-3 hover:shadow-md transition">
+    <div className={`bg-white border-l-4 ${getBorderColor(incident.tipo_incidente)} rounded p-4 mb-3 hover:shadow-md transition`}>
       <div className="cursor-pointer" onClick={onSelect}>
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex items-start gap-2">
@@ -72,7 +99,7 @@ export default function IncidentCard({
 
             <div>
               <h4 className="font-bold text-sm text-gray-900">
-                {incident.tipo_incidente.toUpperCase()}
+                {getTipoLabel(incident.tipo_incidente)}
               </h4>
 
               <p className="text-xs text-gray-500">
