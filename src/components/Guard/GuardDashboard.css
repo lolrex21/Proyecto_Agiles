@@ -2598,3 +2598,28 @@
     grid-template-columns: 1fr;
   }
 }
+/* =========================================================
+   FIX MÓVIL — Solo GUARDIA: mapa arriba, lista de incidentes debajo
+   ========================================================= */
+@media (max-width: 900px) {
+  /* La vista dividida del guardia deja de ser 2 columnas y se apila */
+  .guard-dashboard.guard-view .dashboard-content.split {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      'map'
+      'list';
+  }
+
+  /* El cuadro de incidentes fluye debajo del mapa, sin scroll interno que lo colapse */
+  .guard-dashboard.guard-view .list-section {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .guard-dashboard.guard-view .list-section .incident-list-scroll {
+    overflow: visible;
+    min-height: 0;
+  }
+}

@@ -10,6 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^7.6.6",
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/browser": "^7.0.5",
+    "@capacitor/core": "^7.6.6",
+    "@capacitor/geolocation": "^7.1.8",
     "@react-google-maps/api": "^2.20.8",
     "@supabase/supabase-js": "^2.105.4",
     "bcryptjs": "^2.4.3",
@@ -19,6 +24,7 @@
     "recharts": "^2.15.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.6",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.0",
     "@types/bcryptjs": "^2.4.6",
@@ -34,5 +40,8 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10"
+  },
+  "overrides": {
+    "react-is": "^19.2.6"
   }
 }

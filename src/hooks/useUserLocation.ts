@@ -1,4 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { Geolocation } from '@capacitor/geolocation'
 
 // ─── Tipos ────────────────────────────────────────────────────
 export interface UserLocation {
@@ -24,34 +26,58 @@ export const useUserLocation = () => {
   const watchIdRef = useRef<number | null>(null)
 
   // ── A-18.2: Solicitar ubicación puntual ──────────────────────
-  const requestLocation = useCallback(() => {
+  const requestLocation = useCallback(async () => {
+    setStatus('loading')
+    setErrorMsg(null)
+
+    // Camino nativo (APK): usa el plugin de Capacitor
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const perm = await Geolocation.requestPermissions()
+        if (perm.location === 'denied') {
+          setStatus('denied')
+          setErrorMsg('Permiso de ubicación denegado. Actívalo en los ajustes del teléfono.')
+          return
+        }
+
+        const pos = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+        })
+
+        setLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        })
+        setStatus('success')
+      } catch {
+        setStatus('error')
+        setErrorMsg('No se pudo obtener la ubicación. Verifica el GPS y los permisos.')
+      }
+      return
+    }
+
+    // Camino web (navegador): tu lógica original
     if (!navigator.geolocation) {
       setStatus('error')
       setErrorMsg('Tu navegador no soporta geolocalización.')
       return
     }
 
-    setStatus('loading')
-    setErrorMsg(null)
-
     navigator.geolocation.getCurrentPosition(
-      // ── Éxito ──────────────────────────────────────────────
       (pos) => {
         setLocation({
-          lat:      pos.coords.latitude,
-          lng:      pos.coords.longitude,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
         })
         setStatus('success')
       },
-
-      // ── A-18.5: Manejo de errores ───────────────────────────
       (err) => {
         if (err.code === GeolocationPositionError.PERMISSION_DENIED) {
           setStatus('denied')
-          setErrorMsg(
-            'Permiso de ubicación denegado. Actívalo en la configuración del navegador.'
-          )
+          setErrorMsg('Permiso de ubicación denegado. Actívalo en la configuración del navegador.')
         } else if (err.code === GeolocationPositionError.TIMEOUT) {
           setStatus('error')
           setErrorMsg('Tiempo de espera agotado al obtener la ubicación. Inténtalo de nuevo.')
@@ -60,8 +86,6 @@ export const useUserLocation = () => {
           setErrorMsg('No se pudo obtener la ubicación. Verifica tu conexión o GPS.')
         }
       },
-
-      // Opciones de precisión
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     )
   }, [])

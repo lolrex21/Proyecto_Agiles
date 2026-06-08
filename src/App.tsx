@@ -5,6 +5,9 @@ import {
   getCurrentUser,
   syncGoogleSession,
 } from './services/authService'
+import { App as CapacitorApp } from '@capacitor/app'
+import { Capacitor } from '@capacitor/core'
+import { Browser } from '@capacitor/browser'
 
 import LoginForm from './components/Student/LoginForm'
 import IncidentReportForm from './components/Student/IncidentReportForm'
@@ -35,10 +38,12 @@ function App() {
     }
 
     const applyResult = async (session: any) => {
+      
       if (handled || !isMounted) return
       handled = true
 
       const result = await syncGoogleSession(session)
+      console.log('[GoogleLogin] resultado:', result)  // TEMPORAL — quitar luego
 
       if (!isMounted) return
 
@@ -83,6 +88,7 @@ function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+       console.log('[auth] evento:', event, '| hay sesión?:', !!session) 
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
         void applyResult(session)
       }
@@ -93,6 +99,40 @@ function App() {
     return () => {
       isMounted = false
       subscription.unsubscribe()
+    }
+  }, [])
+
+  // Captura el deep link de regreso de Google OAuth en la APK
+  // (este useEffect va al nivel superior del componente, NO dentro del de arriba)
+  // Captura el deep link de regreso de Google OAuth en la APK
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    const listenerPromise = CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
+      if (!url.includes('auth-callback')) return
+
+      try {
+        // El code viene como parámetro ?code=... ; hay que extraerlo y pasar SOLO el code
+        const code = new URL(url).searchParams.get('code')
+
+        if (!code) {
+          console.error('[GoogleLogin] el deep link no trajo code:', url)
+          return
+        }
+
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (error) {
+          console.error('[GoogleLogin] error al canjear el code:', error.message)
+        }
+
+        await Browser.close()
+      } catch (e) {
+        console.error('[GoogleLogin] excepción en el canje:', e)
+      }
+    })
+
+    return () => {
+      void listenerPromise.then((listener) => listener.remove())
     }
   }, [])
 

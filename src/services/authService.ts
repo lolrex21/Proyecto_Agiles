@@ -1,6 +1,8 @@
 import { supabase } from './supabaseClient'
 import type { Session } from '@supabase/supabase-js'
 import type { AuthResult, LoginData } from '../types/auth'
+import { Capacitor } from '@capacitor/core'
+import { Browser } from '@capacitor/browser'
 
 const USER_STORAGE_KEY = 'uta-auth-user'
 const SESSION_TOKEN_KEY = 'uta-auth-token'
@@ -222,11 +224,17 @@ export const loginUser = async ({ username, password }: LoginData): Promise<Auth
 export const signInWithGoogle = async (): Promise<AuthResult> => {
   clearLocalSession()
 
-  const { error } = await supabase.auth.signInWithOAuth({
+  const isNative = Capacitor.isNativePlatform()
+  const redirectTo = isNative
+    ? 'com.uta.campusseguro://auth-callback'
+    : window.location.origin
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       scopes: 'email profile',
-      redirectTo: window.location.origin,
+      redirectTo,
+      skipBrowserRedirect: isNative, // en móvil abrimos el navegador nosotros
     },
   })
 
@@ -235,6 +243,11 @@ export const signInWithGoogle = async (): Promise<AuthResult> => {
       success: false,
       message: error.message || 'No se pudo iniciar sesión con Google.',
     }
+  }
+
+  // En la APK abrimos la URL de Google en el navegador del sistema.
+  if (isNative && data?.url) {
+    await Browser.open({ url: data.url })
   }
 
   return {
