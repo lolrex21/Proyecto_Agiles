@@ -1,65 +1,29 @@
-import { supabase } from './supabaseClient'
+import {
+  polygonsRepo,
+  type CoordinatesPoint,
+  type ZonePolygon,
+} from '../db/polygonsRepo'
+import { incidentsRepo } from '../db/incidentsRepo'
 
-export interface CoordinatesPoint {
-  lat: number
-  lng: number
-}
-
-export interface ZonePolygon {
-  id: number
-  nombre: string
-  descripcion?: string
-  coordenadas: CoordinatesPoint[]
-  color: string
-  zona_tipo?: string
-  campus?: string
-}
+export type { CoordinatesPoint, ZonePolygon }
 
 // 📌 OBTENER TODAS LAS ZONAS DEL CAMPUS HUACHI
 export const getZonePolygons = async (): Promise<ZonePolygon[]> => {
-  const { data, error } = await supabase
-    .from('zonas')
-    .select('*')
-    .eq('campus', 'Huachi')
-    .order('id', { ascending: true })
-
-  if (error) {
+  try {
+    return await polygonsRepo.listByCampus('Huachi')
+  } catch (error) {
     console.error('Error fetching zones:', error)
     return []
   }
-
-  return (data || []).map((zone: any) => ({
-    id: zone.id,
-    nombre: zone.nombre,
-    descripcion: zone.descripcion,
-    coordenadas: zone.coordenadas,
-    color: zone.color,
-    zona_tipo: zone.zona_tipo,
-    campus: zone.campus,
-  }))
 }
 
 // 📌 OBTENER UNA ZONA ESPECÍFICA
 export const getZoneById = async (id: number): Promise<ZonePolygon | null> => {
-  const { data, error } = await supabase
-    .from('zonas')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error) {
+  try {
+    return await polygonsRepo.findById(id)
+  } catch (error) {
     console.error('Error fetching zone:', error)
     return null
-  }
-
-  return {
-    id: data.id,
-    nombre: data.nombre,
-    descripcion: data.descripcion,
-    coordenadas: data.coordenadas,
-    color: data.color,
-    zona_tipo: data.zona_tipo,
-    campus: data.campus,
   }
 }
 
@@ -94,10 +58,9 @@ export const getZoneByPoint = async (
   lng: number
 ): Promise<ZonePolygon | null> => {
   try {
-    const zones = await getZonePolygons()
+    const zones = await polygonsRepo.listByCampus('Huachi')
     const point: CoordinatesPoint = { lat, lng }
 
-    // Buscar en cuál zona está el punto
     for (const zone of zones) {
       if (isPointInPolygon(point, zone.coordenadas)) {
         console.log(`Incidente en: ${zone.nombre}`)
@@ -118,14 +81,10 @@ export const updateIncidentZone = async (
   incidentId: number,
   zoneId: number
 ): Promise<boolean> => {
-  const { error } = await supabase
-    .from('incidentes')
-    .update({ zona_id: zoneId })
-    .eq('id', incidentId)
-
-  if (error) {
+  try {
+    return await incidentsRepo.updateZone(incidentId, zoneId)
+  } catch (error) {
     console.error('Error updating incident zone:', error)
     return false
   }
-  return true
 }

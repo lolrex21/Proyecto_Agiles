@@ -1,7 +1,5 @@
-// src/pages/GuardDashboardPage.tsx
+import GuardDashboard from '../components/Guard/GuardDashboard'
 
-import { GuardDashboard } from '../components/Guard';
-
-export const GuardDashboardPage: React.FC = () => {
-  return <GuardDashboard />;
-};
+export const GuardDashboardPage = () => {
+  return <GuardDashboard />
+}

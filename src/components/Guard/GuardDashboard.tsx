@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import type { Incident } from '../../types/incident'
 import Header from '../Header'
 import SearchBar from '../SearchBar'
 import IncidentMap from '../Map/IncidentMap'
@@ -76,7 +77,7 @@ export default function GuardDashboard() {
     })
   }, [sanitizeIncident])
 
-  const getIncidentById = useCallback(async (incidentId: number) => {
+  const getIncidentById = useCallback(async (incidentId: number): Promise<Incident | null> => {
     const { data, error } = await supabase
       .from('incidentes')
       .select('*')
@@ -87,7 +88,11 @@ export default function GuardDashboard() {
       throw new Error(error.message)
     }
 
-    return data
+    if (!data) return null
+    // El cliente Supabase tipado devuelve `estado: string` (genérico),
+    // pero el dominio conoce los literales posibles. Hacemos cast aquí
+    // porque ya tenemos un CHECK constraint en la BD que los valida.
+    return data as unknown as Incident
   }, [])
 
   const checkActiveIncidentForGuard = useCallback(async () => {
@@ -505,7 +510,7 @@ const { zones } = usePolygons()
                     <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Ubicación</span>
                   </div>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
-                    {selectedIncident.ubicacion || 'No especificada'}
+                    {selectedIncident.descripcion || 'No especificada'}
                   </div>
                 </div>
 

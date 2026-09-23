@@ -7,7 +7,7 @@ export interface TrustGroup {
   id: number
   usuario_creador_id: number
   nombre: string
-  descripcion?: string
+  descripcion?: string | null
   created_at: string
   updated_at: string
 }
@@ -28,7 +28,7 @@ export interface TrustGroupMember {
 export interface GroupNotification {
   id: number
   grupo_id: number
-  incidente_id: number
+  incidente_id: number | null
   usuario_emisor_id: number
   mensaje: string
   leida: boolean

@@ -1,62 +1,45 @@
-import { supabase } from './supabaseClient'
+import { incidentsRepo, type Incidente } from '../db/incidentsRepo'
 import type { Incident } from '../types/incident'
 
 // Obtener todos los incidentes
 export const getIncidents = async (): Promise<Incident[]> => {
-  const { data, error } = await supabase
-    .from('incidentes')
-    .select(`
-      *,
-      usuario:usuarios(nombre)
-    `)
-    .order('id', { ascending: false })
-
-  if (error) {
+  try {
+    const rows = await incidentsRepo.listAll()
+    return rows as unknown as Incident[]
+  } catch (error) {
     console.error('Error:', error)
     return []
   }
-  return data || []
 }
 
 // Obtener incidentes por estado
-export const getIncidentsByStatus = async (status: string): Promise<Incident[]> => {
-  const { data, error } = await supabase
-    .from('incidentes')
-    .select(`
-      *,
-      usuario:usuarios(nombre)
-    `)
-    .eq('estado', status)
-    .order('id', { ascending: false })
-
-  if (error) return []
-  return data || []
+export const getIncidentsByStatus = async (
+  status: 'Pendiente' | 'Atendido' | 'Cerrado' | 'Cancelado'
+): Promise<Incident[]> => {
+  try {
+    const rows = await incidentsRepo.listByStatus(status)
+    return rows as unknown as Incident[]
+  } catch {
+    return []
+  }
 }
 
 // Actualizar estado
 export const updateIncidentStatus = async (
   id: number,
-  status: 'Pendiente' | 'Atendido' | 'Cerrado'
+  status: 'Pendiente' | 'Atendido' | 'Cerrado' | 'Cancelado'
 ): Promise<boolean> => {
-  const { error } = await supabase
-    .from('incidentes')
-    .update({ estado: status })
-    .eq('id', id)
-
-  return !error
+  return incidentsRepo.updateStatus(id, status)
 }
 
 // Buscar incidentes
 export const searchIncidents = async (query: string): Promise<Incident[]> => {
-  const { data, error } = await supabase
-    .from('incidentes')
-    .select(`
-      *,
-      usuario:usuarios(nombre)
-    `)
-    .or(`tipo_incidente.ilike.%${query}%,descripcion.ilike.%${query}%`)
-    .order('id', { ascending: false })
-
-  if (error) return []
-  return data || []
+  try {
+    const rows = await incidentsRepo.search(query)
+    return rows as unknown as Incident[]
+  } catch {
+    return []
+  }
 }
+
+export type { Incidente }

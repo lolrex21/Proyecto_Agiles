@@ -1,3 +1,6 @@
+import { trustGroupsRepo } from '../db/trustGroupsRepo'
+import { usersRepo } from '../db/usersRepo'
+import { notificationsRepo } from '../db/notificationsRepo'
 import { supabase } from './supabaseClient'
 import type {
   TrustGroup,
@@ -13,19 +16,12 @@ export const createTrustGroup = async (
   try {
     if (!userId) return { success: false, message: 'Usuario no autenticado.' }
 
-    const { data: group, error } = await supabase
-      .from('grupos_confianza')
-      .insert({
-        usuario_creador_id: userId,
-        nombre: data.nombre.trim(),
-        descripcion: data.descripcion?.trim() || null,
-      })
-      .select()
-      .single()
+    const group = await trustGroupsRepo.create(userId, {
+      nombre: data.nombre,
+      descripcion: data.descripcion ?? null,
+    })
 
-    if (error || !group) return { success: false, message: 'No se pudo crear el grupo.' }
-
-    await addMemberByUserId(group.id, userId, 'admin')
+    await trustGroupsRepo.addMember(group.id, userId, 'admin')
 
     return { success: true, message: 'Grupo creado exitosamente.', data: group }
   } catch (error) {
@@ -36,24 +32,9 @@ export const createTrustGroup = async (
 
 export const getUserTrustGroups = async (userId: number): Promise<TrustGroup[]> => {
   try {
-    const { data: memberships, error } = await supabase
-      .from('grupo_miembros')
-      .select('grupo_id')
-      .eq('usuario_id', userId)
-
-    if (error || !memberships) return []
-
-    const groupIds = memberships.map(item => item.grupo_id)
+    const groupIds = await trustGroupsRepo.getGroupIdsForUser(userId)
     if (groupIds.length === 0) return []
-
-    const { data: groups, error: groupError } = await supabase
-      .from('grupos_confianza')
-      .select('*')
-      .in('id', groupIds)
-
-    if (groupError || !groups) return []
-
-    return groups
+    return await trustGroupsRepo.findManyByIds(groupIds)
   } catch (error) {
     console.error('Error al obtener grupos:', error)
     return []
@@ -62,15 +43,7 @@ export const getUserTrustGroups = async (userId: number): Promise<TrustGroup[]> 
 
 export const getTrustGroup = async (groupId: number): Promise<TrustGroup | null> => {
   try {
-    const { data, error } = await supabase
-      .from('grupos_confianza')
-      .select('*')
-      .eq('id', groupId)
-      .single()
-
-    if (error || !data) return null
-
-    return data
+    return await trustGroupsRepo.findById(groupId)
   } catch (error) {
     console.error('Error al obtener grupo:', error)
     return null
@@ -79,26 +52,23 @@ export const getTrustGroup = async (groupId: number): Promise<TrustGroup | null>
 
 export const getGroupMembers = async (groupId: number): Promise<TrustGroupMember[]> => {
   try {
-    const { data: members, error } = await supabase
-      .from('grupo_miembros')
-      .select('id, grupo_id, usuario_id, rol, joined_at')
-      .eq('grupo_id', groupId)
+    const members = await trustGroupsRepo.listMembers(groupId)
+    if (members.length === 0) return []
 
-    if (error || !members) return []
+    const userIds = members.map((member) => member.usuario_id)
+    const users = await usersRepo.findByIds(userIds)
 
-    const userIds = members.map(member => member.usuario_id)
-
-    const { data: users } = await supabase
-      .from('usuarios')
-      .select('id, nombre, correo')
-      .in('id', userIds)
-
-    const userMap = new Map()
-    ;(users || []).forEach(user => userMap.set(user.id, user))
-
-    return members.map(member => ({
+    const userMap = new Map(users.map((user) => [user.id, user]))
+    return members.map((member) => ({
       ...member,
-      usuario: userMap.get(member.usuario_id),
+      rol: member.rol as 'admin' | 'miembro',
+      usuario: userMap.get(member.usuario_id)
+        ? {
+            id: userMap.get(member.usuario_id)!.id,
+            nombre: userMap.get(member.usuario_id)!.nombre,
+            correo: userMap.get(member.usuario_id)!.correo,
+          }
+        : undefined,
     }))
   } catch (error) {
     console.error('Error al obtener miembros:', error)
@@ -110,51 +80,11 @@ export const getGroupMembershipRole = async (
   groupId: number,
   userId: number
 ): Promise<'admin' | 'miembro' | null> => {
-  const { data, error } = await supabase
-    .from('grupo_miembros')
-    .select('rol')
-    .eq('grupo_id', groupId)
-    .eq('usuario_id', userId)
-    .single()
-
-  if (error || !data) return null
-  return data.rol
+  return trustGroupsRepo.getRoleInGroup(groupId, userId)
 }
 
 export const countGroupAdmins = async (groupId: number): Promise<number> => {
-  const { data, error } = await supabase
-    .from('grupo_miembros')
-    .select('id')
-    .eq('grupo_id', groupId)
-    .eq('rol', 'admin')
-
-  if (error || !data) return 0
-  return data.length
-}
-
-const addMemberByUserId = async (
-  groupId: number,
-  userId: number,
-  rol: 'admin' | 'miembro' = 'miembro'
-): Promise<TrustGroupResult> => {
-  try {
-    const { data, error } = await supabase
-      .from('grupo_miembros')
-      .insert({
-        grupo_id: groupId,
-        usuario_id: userId,
-        rol,
-      })
-      .select()
-      .single()
-
-    if (error || !data) return { success: false, message: 'No se pudo agregar el miembro.' }
-
-    return { success: true, message: 'Miembro agregado exitosamente.', data }
-  } catch (error) {
-    console.error('Error al agregar miembro:', error)
-    return { success: false, message: 'Error al agregar miembro.' }
-  }
+  return trustGroupsRepo.countAdmins(groupId)
 }
 
 export const addMemberByEmail = async (
@@ -174,13 +104,8 @@ export const createGroupInvitation = async (
   try {
     const email = invitedEmail.trim().toLowerCase()
 
-    const { data: invitedUser, error: invitedError } = await supabase
-      .from('usuarios')
-      .select('id')
-      .eq('correo', email)
-      .single()
-
-    if (invitedError || !invitedUser) {
+    const invitedUser = await usersRepo.findByEmail(email)
+    if (!invitedUser) {
       return { success: false, message: 'No se encontró un usuario con ese correo.' }
     }
 
@@ -188,40 +113,31 @@ export const createGroupInvitation = async (
       return { success: false, message: 'No puedes invitarte a ti mismo.' }
     }
 
-    const { data: existingMember } = await supabase
-      .from('grupo_miembros')
-      .select('id')
-      .eq('grupo_id', groupId)
-      .eq('usuario_id', invitedUser.id)
-      .maybeSingle()
-
+    const existingMember = await trustGroupsRepo.findExistingMembership(
+      groupId,
+      invitedUser.id
+    )
     if (existingMember) {
       return { success: false, message: 'Este usuario ya es miembro del grupo.' }
     }
 
-    const { data: existingRequest } = await supabase
-      .from('solicitudes_grupo')
-      .select('id')
-      .eq('grupo_id', groupId)
-      .eq('usuario_invitado_id', invitedUser.id)
-      .eq('estado', 'pendiente')
-      .maybeSingle()
-
+    const existingRequest = await trustGroupsRepo.findPendingInvitation(
+      groupId,
+      invitedUser.id
+    )
     if (existingRequest) {
-      return { success: false, message: 'Ya existe una solicitud pendiente para este usuario.' }
+      return {
+        success: false,
+        message: 'Ya existe una solicitud pendiente para este usuario.',
+      }
     }
 
-    const { error } = await supabase
-      .from('solicitudes_grupo')
-      .insert({
-        grupo_id: groupId,
-        usuario_invitado_id: invitedUser.id,
-        usuario_solicitante_id: requesterId,
-        mensaje: message || 'Te invitaron a un grupo de confianza.',
-        estado: 'pendiente',
-      })
-
-    if (error) throw error
+    await trustGroupsRepo.createInvitation({
+      grupoId: groupId,
+      invitedUserId: invitedUser.id,
+      requesterId,
+      mensaje: message,
+    })
 
     return { success: true, message: 'Solicitud enviada correctamente.' }
   } catch (error) {
@@ -236,32 +152,23 @@ export const respondToGroupInvitation = async (
   accept: boolean
 ): Promise<TrustGroupResult> => {
   try {
-    const { data: request, error } = await supabase
-      .from('solicitudes_grupo')
-      .select('*')
-      .eq('id', requestId)
-      .eq('usuario_invitado_id', userId)
-      .eq('estado', 'pendiente')
-      .single()
-
-    if (error || !request) {
+    const request = await trustGroupsRepo.findPendingRequest(requestId, userId)
+    if (!request) {
       return { success: false, message: 'Solicitud no encontrada.' }
     }
 
     if (!accept) {
-      await supabase.from('solicitudes_grupo').update({ estado: 'rechazado' }).eq('id', requestId)
+      await trustGroupsRepo.updateRequestStatus(requestId, 'rechazado')
       return { success: true, message: 'Solicitud rechazada.' }
     }
 
-    const addResult = await addMemberByUserId(request.grupo_id, userId, 'miembro')
-    if (!addResult.success) return addResult
-
-    await supabase.from('solicitudes_grupo').update({ estado: 'aceptado' }).eq('id', requestId)
+    await trustGroupsRepo.addMember(request.grupo_id, userId, 'miembro')
+    await trustGroupsRepo.updateRequestStatus(requestId, 'aceptado')
 
     return { success: true, message: 'Solicitud aceptada.' }
   } catch (error) {
     console.error('Error al responder solicitud:', error)
-    return { success: false, message: 'Error al procesar solicitud.' }
+    return { success: false, message: 'Error al procesar la solicitud.' }
   }
 }
 
@@ -270,25 +177,19 @@ export const removeMember = async (
   currentUserId: number
 ): Promise<TrustGroupResult> => {
   try {
-    const { data: member, error } = await supabase
-      .from('grupo_miembros')
-      .select('*')
-      .eq('id', memberId)
-      .single()
+    const member = await trustGroupsRepo.findMemberById(memberId)
+    if (!member) return { success: false, message: 'Miembro no encontrado.' }
 
-    if (error || !member) return { success: false, message: 'Miembro no encontrado.' }
-
-    const currentRole = await getGroupMembershipRole(member.grupo_id, currentUserId)
+    const currentRole = await trustGroupsRepo.getRoleInGroup(
+      member.grupo_id,
+      currentUserId
+    )
     if (currentRole !== 'admin') {
       return { success: false, message: 'Solo el admin puede eliminar miembros.' }
     }
 
-    const { error: deleteError } = await supabase
-      .from('grupo_miembros')
-      .delete()
-      .eq('id', memberId)
-
-    if (deleteError) return { success: false, message: 'No se pudo eliminar el miembro.' }
+    const ok = await trustGroupsRepo.removeMemberById(memberId)
+    if (!ok) return { success: false, message: 'No se pudo eliminar el miembro.' }
 
     return { success: true, message: 'Miembro eliminado.' }
   } catch (error) {
@@ -302,24 +203,23 @@ export const leaveGroup = async (
   userId: number
 ): Promise<TrustGroupResult> => {
   try {
-    const role = await getGroupMembershipRole(groupId, userId)
-
-    if (!role) return { success: false, message: 'No eres miembro de este grupo.' }
+    const role = await trustGroupsRepo.getRoleInGroup(groupId, userId)
+    if (!role) {
+      return { success: false, message: 'No eres miembro de este grupo.' }
+    }
 
     if (role === 'admin') {
-      const adminCount = await countGroupAdmins(groupId)
+      const adminCount = await trustGroupsRepo.countAdmins(groupId)
       if (adminCount <= 1) {
-        return { success: false, message: 'No puedes salir si eres el único admin.' }
+        return {
+          success: false,
+          message: 'No puedes salir si eres el único admin.',
+        }
       }
     }
 
-    const { error } = await supabase
-      .from('grupo_miembros')
-      .delete()
-      .eq('grupo_id', groupId)
-      .eq('usuario_id', userId)
-
-    if (error) return { success: false, message: 'No se pudo salir del grupo.' }
+    const ok = await trustGroupsRepo.removeUserFromGroup(groupId, userId)
+    if (!ok) return { success: false, message: 'No se pudo salir del grupo.' }
 
     return { success: true, message: 'Saliste del grupo.' }
   } catch (error) {
@@ -333,26 +233,18 @@ export const deleteTrustGroup = async (
   currentUserId: number
 ): Promise<TrustGroupResult> => {
   try {
-    const role = await getGroupMembershipRole(groupId, currentUserId)
-
+    const role = await trustGroupsRepo.getRoleInGroup(groupId, currentUserId)
     if (role !== 'admin') {
       return { success: false, message: 'Solo el admin puede eliminar el grupo.' }
     }
 
-    const { error } = await supabase
-      .from('grupos_confianza')
-      .delete()
-      .eq('id', groupId)
-
-    if (error) {
-      console.error('Error Supabase al eliminar grupo:', error)
-      return { success: false, message: error.message || 'No se pudo eliminar el grupo.' }
-    }
+    const ok = await trustGroupsRepo.deleteById(groupId)
+    if (!ok) return { success: false, message: 'No se pudo eliminar el grupo.' }
 
     return { success: true, message: 'Grupo eliminado.' }
   } catch (error) {
     console.error('Error al eliminar grupo:', error)
-    return { success: false, message: 'Error al eliminar grupo.' }
+    return { success: false, message: 'Error al eliminar el grupo.' }
   }
 }
 
@@ -371,24 +263,14 @@ export const notifyGroupMembers = async (
 
     if (error || !members || members.length === 0) return false
 
-    const notifications = members.map(member => ({
-      grupo_id: groupId,
-      incidente_id: incidentId,
-      usuario_emisor_id: userIdEmitter,
-      mensaje: message,
-      leida: false,
-    }))
-
-    const { error: insertError } = await supabase
-      .from('notificaciones_grupo')
-      .insert(notifications)
-
-    if (insertError) {
-      console.error('Error al notificar miembros:', insertError)
-      return false
-    }
-
-    return true
+    const memberUserIds = members.map((m) => m.usuario_id)
+    return await notificationsRepo.notifyGroupMembers(
+      groupId,
+      incidentId,
+      userIdEmitter,
+      message,
+      memberUserIds
+    )
   } catch (error) {
     console.error('Error al notificar grupo:', error)
     return false
@@ -396,29 +278,19 @@ export const notifyGroupMembers = async (
 }
 
 export const getUnreadNotifications = async (userId: number) => {
-  const { data, error } = await supabase
-    .from('solicitudes_grupo')
-    .select('*')
-    .eq('usuario_invitado_id', userId)
-    .eq('estado', 'pendiente')
-    .order('created_at', { ascending: false })
-
-  if (error) {
+  try {
+    return await trustGroupsRepo.listPendingInvitationsForUser(userId)
+  } catch (error) {
     console.error('Error al obtener notificaciones:', error)
     return []
   }
-
-  return data || []
 }
 
-export const markNotificationAsRead = async (notificationId: number): Promise<boolean> => {
+export const markNotificationAsRead = async (
+  notificationId: number
+): Promise<boolean> => {
   try {
-    const { error } = await supabase
-      .from('notificaciones_grupo')
-      .update({ leida: true })
-      .eq('id', notificationId)
-
-    return !error
+    return await notificationsRepo.markGroupRead(notificationId)
   } catch (error) {
     console.error('Error al marcar notificación:', error)
     return false
