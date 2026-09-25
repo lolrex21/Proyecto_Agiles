@@ -7,11 +7,12 @@ import {
   type FormEvent,
 } from 'react'
 import Toast from '../Toast'
-import { supabase } from '../../services/supabaseClient'
 import { getCurrentUser } from '../../services/authService'
 import { emergencySocket } from '../../services/emergencySocket'
 import { getUserTrustGroups, notifyGroupMembers } from '../../services/trustGroupService'
 import { useEmergencySocket } from '../../hooks/useEmergencySocket'
+import { getCurrentLocation } from '../../hooks/useGeolocation'
+import { reportIncident, updateIncidentDetails, cancelIncident } from '../../services/incidentService'
 
 type IncidentType =
   | ''
@@ -29,10 +30,7 @@ interface FormData {
   foto: File | null
 }
 
-interface CurrentLocation {
-  latitud: number
-  longitud: number
-}
+
 
 const INCIDENT_TYPES: { value: IncidentType; label: string }[] = [
   { value: '', label: 'Seleccionar tipo...' },
@@ -55,35 +53,7 @@ const HOLD_DURATION = 2000
 const BUTTON_RADIUS = 96
 const CIRCUMFERENCE = 2 * Math.PI * BUTTON_RADIUS
 
-function getCurrentLocation(): Promise<CurrentLocation> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Tu navegador no permite obtener la ubicación.'))
-      return
-    }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          latitud: position.coords.latitude,
-          longitud: position.coords.longitude,
-        })
-      },
-      (error) => {
-        if (error.code === error.PERMISSION_DENIED) {
-          reject(new Error('Debes permitir el acceso a tu ubicación para enviar la emergencia.'))
-          return
-        }
-        if (error.code === error.TIMEOUT) {
-          reject(new Error('No se pudo obtener tu ubicación a tiempo. Intenta nuevamente.'))
-          return
-        }
-        reject(new Error('No se pudo obtener tu ubicación actual.'))
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    )
-  })
-}
 
 export default function IncidentReportForm() {
   // phase: 'idle' = botón de pánico | 'form' = emergencia ya enviada, detalles opcionales
@@ -144,24 +114,23 @@ export default function IncidentReportForm() {
       const user = getCurrentUser()
       const location = await getCurrentLocation()
 
-      const { data: newIncident, error } = await supabase
-        .from('incidentes')
-        .insert([
-          {
-            usuario_id: user?.id || null,
-            zona_id: null,
-            tipo_incidente: 'otro',
-            descripcion: 'Emergencia reportada (sin detalles aún)',
-            estado: 'Pendiente',
-            latitud: location.latitud,
-            longitud: location.longitud,
-            guardia_id: null,
-          },
-        ])
-        .select('*')
-        .single()
+      let newIncident = null
+      try {
+        newIncident = await reportIncident({
+          usuario_id: user?.id || null,
+          zona_id: null,
+          tipo_incidente: 'otro',
+          descripcion: 'Emergencia reportada (sin detalles aún)',
+          estado: 'Pendiente',
+          latitud: location.latitud,
+          longitud: location.longitud,
+          guardia_id: null,
+        })
+      } catch (error) {
+        // Ignored, handled below
+      }
 
-      if (error || !newIncident) {
+      if (!newIncident) {
         setSubmitError('No se pudo enviar la emergencia. Intenta nuevamente.')
         return
       }
@@ -210,17 +179,17 @@ export default function IncidentReportForm() {
           `Ubicación: ${formData.ubicacion.trim() || 'No especificada'}\n` +
           `Descripción: ${formData.descripcion.trim() || 'Sin detalles'}`
 
-        const { data: updated, error } = await supabase
-          .from('incidentes')
-          .update({
+        let updated = null
+        try {
+          updated = await updateIncidentDetails(activeIncidentId, {
             tipo_incidente: formData.tipo || 'otro',
             descripcion,
           })
-          .eq('id', activeIncidentId)
-          .select('*')
-          .single()
+        } catch (error) {
+          // Ignored
+        }
 
-        if (error || !updated) {
+        if (!updated) {
           setSubmitError('No se pudieron guardar los detalles. Intenta nuevamente.')
           return
         }
@@ -247,14 +216,14 @@ export default function IncidentReportForm() {
     setSubmitError('')
 
     try {
-      const { data: cancelled, error } = await supabase
-        .from('incidentes')
-        .update({ estado: 'Cancelado' })
-        .eq('id', activeIncidentId)
-        .select('*')
-        .single()
+      let cancelled = null
+      try {
+        cancelled = await cancelIncident(activeIncidentId)
+      } catch (error) {
+        // Ignored
+      }
 
-      if (error || !cancelled) {
+      if (!cancelled) {
         setSubmitError('No se pudo cancelar el incidente. Intenta nuevamente.')
         return
       }

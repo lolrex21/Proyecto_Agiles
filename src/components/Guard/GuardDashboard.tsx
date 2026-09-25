@@ -1,13 +1,12 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import type { Incident } from '../../types/incident'
+import { useState, useMemo, useCallback } from 'react'
 import Header from '../Header'
 import SearchBar from '../SearchBar'
 import IncidentMap from '../Map/IncidentMap'
 import IncidentList from '../IncidentList'
 import { useIncidents } from '../../hooks/useIncidents'
 import { useEmergencySocket } from '../../hooks/useEmergencySocket'
-import { emergencySocket } from '../../services/emergencySocket'
-import { supabase } from '../../services/supabaseClient'
+import { useGuardActions } from '../../hooks/useGuardActions'
+import { useNotificationPermission } from '../../hooks/useNotificationPermission'
 import { getCurrentUser } from '../../services/authService'
 import './GuardDashboard.css'
 import { usePolygons } from '../../hooks/usePolygons'
@@ -28,9 +27,19 @@ export default function GuardDashboard() {
   const guardId = user?.id ? String(user.id) : ''
 
   const [viewMode, setViewMode] = useState<'split' | 'map' | 'list'>('split')
-  const [activeAlerts, setActiveAlerts] = useState<any[]>([])
-  const [currentIncidentId, setCurrentIncidentId] = useState<string | null>(null)
-  const [confirmCloseId, setConfirmCloseId] = useState<number | null>(null)
+  useNotificationPermission()
+
+  const {
+    activeAlerts,
+    currentIncidentId,
+    confirmCloseId,
+    setConfirmCloseId,
+    setCurrentIncidentId,
+    upsertLocalIncident,
+    sanitizeIncident,
+    handleTakeIncident,
+    handleCloseIncident,
+  } = useGuardActions(guardId, setSelectedIncident)
 
   const visibleIncidents = useMemo(() => {
     const map = new Map<string, any>()
@@ -55,241 +64,7 @@ export default function GuardDashboard() {
     )
   }, [visibleIncidents])
 
-  const sanitizeIncident = useCallback((incident: any) => {
-    const { usuario, user, ...rest } = incident
-    return rest
-  }, [])
 
-  const upsertLocalIncident = useCallback((incident: any) => {
-    const cleanIncident = sanitizeIncident(incident)
-
-    setActiveAlerts((prev) => {
-      const incidentId = String(cleanIncident.id)
-      const exists = prev.some((item) => String(item.id) === incidentId)
-
-      if (exists) {
-        return prev.map((item) =>
-          String(item.id) === incidentId ? cleanIncident : item
-        )
-      }
-
-      return [cleanIncident, ...prev]
-    })
-  }, [sanitizeIncident])
-
-  const getIncidentById = useCallback(async (incidentId: number): Promise<Incident | null> => {
-    const { data, error } = await supabase
-      .from('incidentes')
-      .select('*')
-      .eq('id', incidentId)
-      .maybeSingle()
-
-    if (error) {
-      throw new Error(error.message)
-    }
-
-    if (!data) return null
-    // El cliente Supabase tipado devuelve `estado: string` (genérico),
-    // pero el dominio conoce los literales posibles. Hacemos cast aquí
-    // porque ya tenemos un CHECK constraint en la BD que los valida.
-    return data as unknown as Incident
-  }, [])
-
-  const checkActiveIncidentForGuard = useCallback(async () => {
-    if (!guardId) return
-
-    try {
-      const { data, error } = await supabase
-        .from('incidentes')
-        .select('*')
-        .eq('guardia_id', guardId)
-        .eq('estado', 'Atendido')
-        .limit(1)
-        .maybeSingle()
-
-      if (error) throw new Error(error.message)
-
-      if (data) {
-        setCurrentIncidentId(String(data.id))
-        upsertLocalIncident(data)
-      } else {
-        setCurrentIncidentId(null)
-      }
-    } catch (error) {
-      console.error('No se pudo verificar el caso activo del guardia:', error)
-    }
-  }, [guardId, upsertLocalIncident])
-
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
-  }, [])
-
-  useEffect(() => {
-    checkActiveIncidentForGuard()
-  }, [checkActiveIncidentForGuard])
-
-  const handleTakeIncident = useCallback(
-    async (incident: any): Promise<boolean> => {
-      if (!guardId) {
-        alert('No se encontró el ID del guardia logueado.')
-        return false
-      }
-
-      const incidentId = Number(incident.id)
-      const incidentIdText = String(incident.id)
-
-      if (!incident.id || Number.isNaN(incidentId)) {
-        alert('El incidente no tiene un ID válido.')
-        return false
-      }
-
-      if (incident.estado !== 'Pendiente') {
-        alert(`Este incidente ya fue tomado o cerrado. Estado actual: ${incident.estado}`)
-        return false
-      }
-
-      try {
-        const { data: activeIncident, error: activeError } = await supabase
-          .from('incidentes')
-          .select('*')
-          .eq('guardia_id', guardId)
-          .eq('estado', 'Atendido')
-          .neq('id', incidentId)
-          .limit(1)
-          .maybeSingle()
-
-        if (activeError) throw new Error(activeError.message)
-
-        if (activeIncident) {
-          setCurrentIncidentId(String(activeIncident.id))
-          upsertLocalIncident(activeIncident)
-          alert(
-            `Ya tienes un caso activo. Debes cerrar el incidente #${activeIncident.id} antes de tomar otro.`
-          )
-          return false
-        }
-
-        const existingIncident = await getIncidentById(incidentId)
-
-        if (!existingIncident) {
-          alert(`No existe ningún incidente con id ${incidentId}.`)
-          return false
-        }
-
-        if (existingIncident.estado !== 'Pendiente') {
-          alert(
-            `No se puede tomar este incidente porque su estado actual es "${existingIncident.estado}".`
-          )
-          return false
-        }
-
-        const { error: updateError } = await supabase
-          .from('incidentes')
-          .update({
-            estado: 'Atendido',
-            guardia_id: guardId,
-          })
-          .eq('id', incidentId)
-          .eq('estado', 'Pendiente')
-
-        if (updateError) throw new Error(updateError.message)
-
-        const updatedIncident = await getIncidentById(incidentId)
-
-        if (
-          !updatedIncident ||
-          updatedIncident.estado !== 'Atendido' ||
-          String(updatedIncident.guardia_id) !== guardId
-        ) {
-          alert('No se pudo confirmar la actualización del incidente.')
-          return false
-        }
-
-        setCurrentIncidentId(incidentIdText)
-        upsertLocalIncident(updatedIncident)
-        setSelectedIncident(updatedIncident)
-
-        emergencySocket.takeIncident(incidentIdText, guardId, updatedIncident)
-        emergencySocket.updateIncident(incidentIdText, 'Atendido', guardId)
-
-        return true
-      } catch (error) {
-        console.error('Error tomando incidente:', error)
-        alert('No se pudo tomar el incidente.')
-        return false
-      }
-    },
-    [guardId, getIncidentById, setSelectedIncident, upsertLocalIncident]
-  )
-
-  const handleCloseIncident = useCallback(
-    async (incident: any): Promise<boolean> => {
-      if (!guardId) {
-        alert('No se encontró el ID del guardia logueado.')
-        return false
-      }
-
-      const incidentId = Number(incident.id)
-      const incidentIdText = String(incident.id)
-
-      if (!incident.id || Number.isNaN(incidentId)) {
-        alert('El incidente no tiene un ID válido.')
-        return false
-      }
-
-      if (incident.estado !== 'Atendido') {
-        alert('Solo puedes cerrar un caso que esté Atendido.')
-        return false
-      }
-
-      if (String(incident.guardia_id) !== guardId) {
-        alert('Solo el guardia que tomó este caso puede cerrarlo.')
-        return false
-      }
-
-      try {
-        const { error: closeError } = await supabase
-          .from('incidentes')
-          .update({
-            estado: 'Cerrado',
-          })
-          .eq('id', incidentId)
-          .eq('guardia_id', guardId)
-          .eq('estado', 'Atendido')
-
-        if (closeError) throw new Error(closeError.message)
-
-        const closedIncident = await getIncidentById(incidentId)
-
-        if (!closedIncident || closedIncident.estado !== 'Cerrado') {
-          alert('No se pudo confirmar el cierre del incidente.')
-          return false
-        }
-
-        setCurrentIncidentId(null)
-        upsertLocalIncident(closedIncident)
-        setSelectedIncident(closedIncident)
-
-        emergencySocket.closeIncident(
-          incidentIdText,
-          guardId,
-          'Caso cerrado',
-          closedIncident
-        )
-
-        emergencySocket.updateIncident(incidentIdText, 'Cerrado', guardId)
-
-        return true
-      } catch (error) {
-        console.error('Error cerrando incidente:', error)
-        alert('No se pudo cerrar el incidente.')
-        return false
-      }
-    },
-    [guardId, getIncidentById, setSelectedIncident, upsertLocalIncident]
-  )
 
   const handleIncidentStatusUpdate = useCallback(
     async (id: number, status: IncidentStatus): Promise<boolean> => {
