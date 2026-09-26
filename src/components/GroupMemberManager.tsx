@@ -61,6 +61,7 @@ export default function GroupMemberManager({ group, onMemberAdded }: GroupMember
     setIsSubmitting(true)
     setMessage('')
 
+    try {
     const result = await addMemberByEmail(
       Number(group.id),
       formData.correo.trim(),
@@ -78,6 +79,12 @@ export default function GroupMemberManager({ group, onMemberAdded }: GroupMember
     } else {
       setMessageType('error')
       setMessage(result.message)
+    }
+    } catch {
+      setMessageType('error')
+      setMessage('No se pudo completar la operación. Revisa tu conexión e inténtalo de nuevo.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 

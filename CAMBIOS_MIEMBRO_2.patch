@@ -1,0 +1,1505 @@
+--- a/DOCUMENTACION_REFACTOR.md
++++ b/DOCUMENTACION_REFACTOR.md
+@@ -32,4 +32,74 @@
+ 
+ ---
+ 
+-*(Nota: Los apartados de los siguientes miembros del equipo se irán añadiendo conforme se ejecuten sus refactorizaciones).*
++## Miembro 2: Grupos de Confianza y Notificaciones
++
++### Problema inicial
++
++Los servicios convertían fallos de red o de Supabase en listas vacías, `null`, `false` o contadores en cero. La interfaz confundía una consulta fallida con la ausencia de datos. Algunas escrituras devolvían éxito aunque no afectaran filas; la campana ignoraba el resultado de las invitaciones. La creación del grupo y su administrador eran dos peticiones independientes, y aceptar una invitación separaba la membresía del estado de la solicitud.
++
++### Principios aplicados y razones
++
++1. **Fail Fast:** los errores técnicos se propagan desde los repositorios hasta la interfaz. `[]` representa una lectura exitosa sin registros, `null` representa ausencia y `false` una escritura sin filas o un envío sin destinatarios. Las validaciones esperadas conservan `TrustGroupResult`, con `success` y `message`. No se muestran detalles internos de Supabase al usuario.
++2. **Atomicidad / prevención de estados incompletos:** la migración `20260926223000_miembro2_atomicidad.sql` incorpora dos triggers PostgreSQL. Insertar un grupo también inserta al creador como administrador dentro de la misma transacción. Aceptar una invitación también inserta la membresía dentro de la actualización. Si falla el trigger, PostgreSQL revierte toda la sentencia. No se usa una compensación desde el navegador, que también podría fallar.
++3. **DRY:** `markNotificationAsRead` pasa a ser un alias de `markGroupNotificationRead`. La consulta vive solamente en el repositorio. Se elimina también la consulta directa a Supabase desde `trustGroupService`: reutiliza `listMembers`.
++4. **DIP e ISP:** `createNotificationService` recibe contratos estructurales reducidos para notificaciones, grupos y usuarios. Usa importaciones exclusivamente de tipos; se puede probar sin inicializar Supabase ni configurar `.env`. `notificationService.ts` compone las dependencias reales y conserva los nombres públicos existentes.
++5. **KISS:** se reutilizan repositorios, estados y componentes existentes. No se añade un contenedor de inyección, una jerarquía de clases ni una biblioteca de estado.
++
++### Cambios por archivo
++
++| Archivo | Cambio y comportamiento |
++| --- | --- |
++| `src/services/trustGroupService.ts` | Propaga errores; valida nombre y rol del invitador; elimina las inserciones separadas de administrador y membresía; comprueba el resultado de la respuesta; impide eliminar al único administrador desde este servicio. |
++| `src/services/createNotificationService.ts` | Fábrica independiente de Supabase con dependencias inyectables y contratos reducidos. |
++| `src/services/notificationService.ts` | Composición de la fábrica con los repositorios reales; mantiene la API de funciones exportadas. |
++| `src/db/trustGroupsRepo.ts` | Las escrituras lanzan errores y comprueban filas afectadas. Responder actualiza únicamente solicitudes pendientes. |
++| `src/db/notificationsRepo.ts` | No oculta errores de escritura y detecta IDs inexistentes. Envía una fila por grupo: el esquema no tiene destinatario individual, por lo que insertar una por miembro duplicaba el aviso. |
++| `src/components/TrustGroupList.tsx` | Estado de error y reintento, con manejo de errores al eliminar; muestra el resultado también en los detalles del grupo. |
++| `src/components/TrustGroupForm.tsx` | Captura errores técnicos y libera el botón mediante `finally`; conserva el formulario cuando falla. |
++| `src/components/GroupMemberManager.tsx` | Maneja fallos al invitar y libera el estado de envío. |
++| `src/components/GroupMembersView.tsx` | Distingue error de lista vacía; permite reintentar y captura fallos de eliminación. |
++| `src/components/NotificationBell.tsx` | Maneja fallos de carga y escritura; revisa `success` de invitaciones; deja de actualizar contadores como si una operación fallida hubiera funcionado. |
++| `src/components/NotificationPanel.tsx` | Muestra carga, error y reintento; deshabilita acciones durante una escritura. |
++| `src/components/Student/IncidentReportForm.tsx` | Ajuste mínimo en el bloque que avisa a los grupos: un error secundario se informa como fallo parcial y conserva la emergencia creada y el formulario de detalles. Intenta avisar a todos los grupos aunque alguno falle. No cambia el despacho, GPS ni sockets. |
++| `supabase/migrations/20260926223000_miembro2_atomicidad.sql` | Atomicidad del grupo/administrador y de la aceptación/membresía, con `SECURITY INVOKER`. |
++| `tests/miembro2.test.mjs` | 14 pruebas del servicio con dependencias simuladas. |
++| `tests/miembro2-sql.mjs` | 5 comprobaciones de integración en PostgreSQL embebido PGlite, con fallos inducidos. |
++
++### Aplicación de los cambios
++
++1. Copiar los archivos modificados y nuevos respetando sus rutas. El ZIP incluye el proyecto reconstruido desde el Repomix, sin `node_modules`, `.env` ni compilados. `CAMBIOS_MIEMBRO_2.patch` permite revisar exactamente las diferencias.
++2. Antes de iniciar el frontend nuevo, ejecutar **una sola vez** `supabase/migrations/20260926223000_miembro2_atomicidad.sql` en la base Supabase que utiliza el proyecto. Si se parte de una base vacía, aplicar primero la migración inicial. Coordinar el cambio con el frontend: la versión anterior insertaba manualmente al administrador.
++3. Ejecutar `npm install`. Mantener la configuración local de `.env`; para una instalación nueva usar `.env.example` como guía.
++4. Ejecutar `npm run build`, `node --test tests/miembro2.test.mjs` y `npm run dev`.
++5. Para repetir la prueba SQL aislada, instalar opcionalmente `npm install --no-save --package-lock=false @electric-sql/pglite` y ejecutar `node tests/miembro2-sql.mjs`. Esta prueba crea una base temporal en memoria; no se conecta a Supabase.
++
++### Validación realizada
++
++| Verificación | Resultado |
++| --- | --- |
++| Compilación TypeScript y Vite | Correcta. Se mantiene el aviso de importación dinámica/estática de `supabaseClient` en el dominio de incidentes. |
++| ESLint en los servicios, repositorios y componentes principales intervenidos del miembro 2 | Correcto. Las cargas iniciales usan una excepción local documentada de `set-state-in-effect`; no se cambió la configuración global. |
++| Pruebas del servicio | 14/14 correctas: errores de lectura y escritura, fallos del resumen, ausencia real de datos, composición de contadores, grupos vacíos, escritura sin filas y limpieza de suscripción. |
++| SQL en PGlite | 5/5 correctas: creación con administrador; rollback si falla su inserción; aceptación fallida conserva pendiente; aceptación crea una sola membresía; una solicitud respondida no cambia de decisión. |
++| Supabase real y recorrido visual en navegador | Pendientes de ejecutar con la configuración del equipo; no se dispone de la sesión ni de la base del usuario. |
++
++### Comprobación manual y evidencias
++
++| Caso | Acción | Resultado esperado / evidencia |
++| --- | --- | --- |
++| Grupo nuevo | Crear un grupo con un usuario válido. | Grupo visible y exactamente una membresía `admin` para su creador. Capturar interfaz y filas. |
++| Consulta sin conexión | Activar Offline en herramientas del navegador y volver a abrir grupos o notificaciones. | Mensaje de error, sin presentar el fallo como una lista vacía. |
++| Reintento | Restablecer conexión y pulsar Reintentar. | Carga correcta y desaparición del error. |
++| Formulario fallido | Crear grupo o invitar sin conexión. | Mensaje visible; botón habilitado al terminar; datos del formulario conservados. |
++| Aceptación | Aceptar una invitación pendiente. | Solicitud aceptada y una membresía; contador actualizado tras lectura exitosa. |
++| Respuesta repetida | Responder una invitación ya procesada desde otra vista. | Mensaje de solicitud no encontrada o no pendiente, sin éxito falso. |
++| Lectura de aviso | Marcar como leída; repetir con un ID inexistente o sin conexión. | Solo se confirma con fila actualizada; los fallos se muestran. |
++| Fallo parcial de avisos | Permitir crear el incidente y provocar fallo al consultar/enviar avisos a grupos. | La emergencia conserva su ID y permite agregar detalles; informa el fallo de avisos. |
++
++### Alcance y límites
++
++Se conserva íntegro el apartado de Bryan Quitto y `organizacion.md`. No se implementan tareas de autenticación, modelos base o mapas del miembro 3. El único cambio en un componente de emergencias es el tratamiento del resultado de las notificaciones de grupos, necesario para integrar la propagación de errores.
++
++La migración protege las nuevas creaciones y aceptaciones; no repara automáticamente grupos huérfanos históricos. La comprobación del último administrador en el servicio no es una restricción transaccional para eliminaciones simultáneas desde clientes distintos. La lectura de avisos de grupo continúa siendo compartida (`leida` por grupo), de acuerdo con el esquema original; no se introduce lectura por destinatario. Se conservan la autenticación y las políticas RLS existentes: estos cambios no las sustituyen. Las pruebas embebidas comprueban transacciones SQL, pero no validan permisos, Realtime ni conectividad de la instancia real.
++
+--- a/src/components/GroupMemberManager.tsx
++++ b/src/components/GroupMemberManager.tsx
+@@ -61,6 +61,7 @@
+     setIsSubmitting(true)
+     setMessage('')
+ 
++    try {
+     const result = await addMemberByEmail(
+       Number(group.id),
+       formData.correo.trim(),
+@@ -78,6 +79,12 @@
+     } else {
+       setMessageType('error')
+       setMessage(result.message)
++    }
++    } catch {
++      setMessageType('error')
++      setMessage('No se pudo completar la operación. Revisa tu conexión e inténtalo de nuevo.')
++    } finally {
++      setIsSubmitting(false)
+     }
+   }
+ 
+--- a/src/components/GroupMembersView.tsx
++++ b/src/components/GroupMembersView.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useState } from 'react'
++import { useCallback, useEffect, useState } from 'react'
+ import { getGroupMembers, removeMember } from '../services/trustGroupService'
+ import { getCurrentUser } from '../services/authService'
+ import type { TrustGroup, TrustGroupMember } from '../types/trustGroup'
+@@ -11,6 +11,7 @@
+ export default function GroupMembersView({ group, onMembersChanged }: GroupMembersViewProps) {
+   const [members, setMembers] = useState<TrustGroupMember[]>([])
+   const [isLoading, setIsLoading] = useState(true)
++  const [loadError, setLoadError] = useState('')
+   const [message, setMessage] = useState('')
+   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
+ 
+@@ -18,16 +19,23 @@
+   const currentUserId = currentUser?.id ? Number(currentUser.id) : null
+   const isGroupAdmin = group.usuario_creador_id === currentUserId
+ 
+-  const loadMembers = async () => {
++  const loadMembers = useCallback(async () => {
+     setIsLoading(true)
+-    const groupMembers = await getGroupMembers(Number(group.id))
+-    setMembers(groupMembers)
+-    setIsLoading(false)
+-  }
++    setLoadError('')
++    try {
++      setMembers(await getGroupMembers(Number(group.id)))
++    } catch {
++      setLoadError('No se pudieron cargar los datos. Revisa tu conexión.')
++    } finally {
++      setIsLoading(false)
++    }
++  }, [group.id])
+ 
+   useEffect(() => {
++    // Carga inicial asíncrona; el estado distingue carga, éxito y error.
++    // eslint-disable-next-line react-hooks/set-state-in-effect
+     void loadMembers()
+-  }, [group.id])
++  }, [loadMembers])
+ 
+   const handleRemoveMember = async (memberId: number, memberEmail?: string) => {
+     if (!currentUserId) {
+@@ -46,6 +54,7 @@
+       return
+     }
+ 
++    try {
+     const result = await removeMember(Number(memberId), currentUserId)
+ 
+     if (result.success) {
+@@ -59,6 +68,17 @@
+     }
+ 
+     setTimeout(() => setMessage(''), 3000)
++    } catch {
++      setMessageType('error')
++      setMessage('No se pudo completar la operación. Revisa tu conexión e inténtalo de nuevo.')
++    }
++  }
++
++  if (loadError) {
++    return <div role="alert" className="p-4 text-uta-red">
++      <p>{loadError}</p>
++      <button type="button" onClick={() => void loadMembers()}>Reintentar</button>
++    </div>
+   }
+ 
+   if (isLoading) {
+--- a/src/components/NotificationBell.tsx
++++ b/src/components/NotificationBell.tsx
+@@ -19,6 +19,8 @@
+   const [pendingInvites, setPendingInvites] = useState<GroupRequest[]>([])
+   const [generalNotifications, setGeneralNotifications] = useState<GeneralNotification[]>([])
+   const [groupNotifications, setGroupNotifications] = useState<GroupNotification[]>([])
++  const [error, setError] = useState('')
++  const [busy, setBusy] = useState(false)
+   const [loading, setLoading] = useState(true)
+ 
+   const user = getCurrentUser()
+@@ -31,6 +33,8 @@
+     }
+ 
+     setLoading(true)
++    try {
++      setError('')
+     const [summaryResult, invites, general, group] = await Promise.all([
+       getNotificationSummary(userId),
+       getPendingInvitesForUser(userId),
+@@ -42,12 +46,19 @@
+     setPendingInvites(invites)
+     setGeneralNotifications(general)
+     setGroupNotifications(group)
+-    setLoading(false)
++
++    } catch {
++      setError('No se pudieron actualizar las notificaciones. Revisa tu conexión.')
++    } finally {
++      setLoading(false)
++    }
+   }, [userId])
+ 
+   useEffect(() => {
+     if (!userId) return
+ 
++    // Carga inicial asíncrona al suscribirse a la fuente externa.
++    // eslint-disable-next-line react-hooks/set-state-in-effect
+     void loadNotifications()
+     const subscription = subscribeToNotificationChannels(userId, () => {
+       void loadNotifications()
+@@ -69,36 +80,45 @@
+   const handleRespondInvite = useCallback(
+     async (requestId: number, accept: boolean) => {
+       if (!userId) return
+-      await respondToGroupInvitation(requestId, userId, accept)
+-      await loadNotifications()
++      setBusy(true)
++      setError('')
++      try {
++        const result = await respondToGroupInvitation(requestId, userId, accept)
++        if (!result.success) { setError(result.message); return }
++        await loadNotifications()
++      } catch {
++        setError('No se pudo responder la invitación. Inténtalo de nuevo.')
++      } finally { setBusy(false) }
+     },
+     [loadNotifications, userId]
+   )
+ 
+   const handleMarkGeneralRead = useCallback(
+     async (notificationId: number) => {
+-      await markGeneralNotificationRead(notificationId)
+-      await loadNotifications()
++      setBusy(true)
++      setError('')
++      try {
++        if (!await markGeneralNotificationRead(notificationId)) {
++          setError('No se encontró la notificación. Actualiza la lista.'); return
++        }
++        await loadNotifications()
++      } catch { setError('No se pudo marcar la notificación como leída.') }
++      finally { setBusy(false) }
+     },
+     [loadNotifications]
+   )
+ 
+ const handleMarkGroupRead = useCallback(
+   async (notificationId: number) => {
+-    const ok = await markGroupNotificationRead(Number(notificationId))
+-
+-    if (ok) {
+-      setGroupNotifications(prev =>
+-        prev.filter(item => Number(item.id) !== Number(notificationId))
+-      )
+-
+-      setSummary(prev => ({
+-        ...prev,
+-        unreadGroup: Math.max(prev.unreadGroup - 1, 0),
+-      }))
+-    }
+-
+-    await loadNotifications()
++    setBusy(true)
++    setError('')
++    try {
++      if (!await markGroupNotificationRead(notificationId)) {
++        setError('No se encontró la notificación. Actualiza la lista.'); return
++      }
++      await loadNotifications()
++    } catch { setError('No se pudo marcar la notificación como leída.') }
++    finally { setBusy(false) }
+   },
+   [loadNotifications]
+ )
+@@ -125,8 +145,12 @@
+         )}
+       </button>
+ 
+-      {panelOpen && !loading && (
++      {panelOpen && (
+         <NotificationPanel
++          loading={loading}
++          error={error}
++          busy={busy}
++          onRetry={loadNotifications}
+           pendingInvites={pendingInvites}
+           generalNotifications={generalNotifications}
+           groupNotifications={groupNotifications}
+--- a/src/components/NotificationPanel.tsx
++++ b/src/components/NotificationPanel.tsx
+@@ -1,6 +1,10 @@
+ import type { GeneralNotification, GroupNotification, GroupRequest } from '../types/trustGroup'
+ 
+ interface NotificationPanelProps {
++  loading: boolean
++  error: string
++  busy: boolean
++  onRetry: () => Promise<void>
+   pendingInvites: GroupRequest[]
+   generalNotifications: GeneralNotification[]
+   groupNotifications: GroupNotification[]
+@@ -11,6 +15,7 @@
+ }
+ 
+ export default function NotificationPanel({
++  loading, error, busy, onRetry,
+   pendingInvites,
+   generalNotifications,
+   groupNotifications,
+@@ -31,14 +36,19 @@
+       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+         <div>
+           <p className="text-sm font-semibold text-uta-navy">Notificaciones</p>
+-          <p className="text-xs text-gray-500">Actualizado en tiempo real</p>
++          <p className="text-xs text-gray-500">{loading ? 'Actualizando…' : error ? 'Actualización pendiente' : 'Notificaciones'}</p>
+         </div>
+         <button type="button" onClick={onClose} className="text-gray-500 hover:text-uta-navy">
+           Cerrar
+         </button>
+       </div>
+ 
+-      <div className="max-h-[70vh] overflow-y-auto space-y-4 p-4">
++      {error && <div role="alert" className="p-4 text-uta-red">
++        <p>{error}</p>
++        <button type="button" disabled={loading || busy} onClick={() => void onRetry()}>Reintentar</button>
++      </div>}
++      {loading && <p role="status" className="p-4">Cargando notificaciones...</p>}
++      {!error && !loading && <div className="max-h-[70vh] overflow-y-auto space-y-4 p-4">
+         <section>
+           <div className="flex items-center justify-between mb-3">
+             <h3 className="text-sm font-semibold text-uta-navy">Solicitudes de Grupo</h3>
+@@ -68,6 +78,7 @@
+                   <div className="mt-3 flex gap-2">
+                     <button
+                       type="button"
++                      disabled={busy}
+                       onClick={async () => await onRespondInvite(Number(invite.id), true)}
+                       className="flex-1 rounded-lg bg-uta-gold px-3 py-2 text-xs font-semibold text-uta-navy transition hover:bg-uta-gold-dark"
+                     >
+@@ -76,6 +87,7 @@
+ 
+                     <button
+                       type="button"
++                      disabled={busy}
+                       onClick={async () => await onRespondInvite(Number(invite.id), false)}
+                       className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
+                     >
+@@ -113,7 +125,8 @@
+                     {!item.leido && (
+                       <button
+                         type="button"
+-                        onClick={async () => await onMarkGeneralRead(Number(item.id))}
++                        disabled={busy}
++                      onClick={async () => await onMarkGeneralRead(Number(item.id))}
+                         className="shrink-0 text-xs font-semibold text-uta-gold"
+                       >
+                         Marcar leída
+@@ -151,8 +164,8 @@
+                     {!item.leida && (
+                       <button
+                         type="button"
+-                        onClick={async () => {
+-                          console.log('Marcando notificación de grupo:', item.id)
++                        disabled={busy}
++                      onClick={async () => {
+                           await onMarkGroupRead(Number(item.id))
+                         }}
+                         className="shrink-0 text-xs font-semibold text-uta-gold"
+@@ -166,7 +179,7 @@
+             </div>
+           )}
+         </section>
+-      </div>
++      </div>}
+     </div>
+   )
+ }
+--- a/src/components/Student/IncidentReportForm.tsx
++++ b/src/components/Student/IncidentReportForm.tsx
+@@ -138,22 +138,27 @@
+       setActiveIncidentId(Number(newIncident.id))
+       emergencySocket.createIncident(newIncident)
+ 
+-      // Notificar a los grupos de confianza
+-      if (user?.id) {
+-        const userId = Number(user.id)
+-        const groups = await getUserTrustGroups(userId)
+-        for (const group of groups) {
+-          await notifyGroupMembers(
+-            Number(group.id),
+-            Number(newIncident.id),
+-            userId,
+-            `🚨 ${user?.nombre || 'Un usuario'} reportó una emergencia en el grupo ${group.nombre}`
+-          )
++      // El incidente ya existe: un fallo de notificaciones no debe invitar a reenviarlo.
++      let groupNotificationFailed = false
++      try {
++        if (user?.id) {
++          const userId = Number(user.id)
++          const groups = await getUserTrustGroups(userId)
++          const results = await Promise.allSettled(groups.map(group =>
++            notifyGroupMembers(
++              Number(group.id), Number(newIncident.id), userId,
++              `🚨 ${user?.nombre || 'Un usuario'} reportó una emergencia en el grupo ${group.nombre}`
++            )
++          ))
++          groupNotificationFailed = results.some(result => result.status === 'rejected')
+         }
+-      }
+-
+-      setStatusMessage(
+-        'Emergencia enviada. El guardia ya fue alertado con tu ubicación. Si quieres, agrega detalles abajo.'
++      } catch {
++        groupNotificationFailed = true
++      }
++
++      setStatusMessage(groupNotificationFailed
++        ? 'Emergencia enviada al guardia, pero no se pudo confirmar el aviso a todos tus grupos. Puedes agregar detalles abajo.'
++        : 'Emergencia enviada. El guardia ya fue alertado con tu ubicación. Si quieres, agrega detalles abajo.'
+       )
+       setPhase('form')
+     } catch (err) {
+--- a/src/components/TrustGroupForm.tsx
++++ b/src/components/TrustGroupForm.tsx
+@@ -71,6 +71,7 @@
+       descripcion: formData.descripcion || undefined,
+     }
+ 
++    try {
+     const result = await createTrustGroup(userId, data)
+ 
+     setIsSubmitting(false)
+@@ -87,6 +88,12 @@
+     } else {
+       setMessageType('error')
+       setMessage(result.message)
++    }
++    } catch {
++      setMessageType('error')
++      setMessage('No se pudo completar la operación. Revisa tu conexión e inténtalo de nuevo.')
++    } finally {
++      setIsSubmitting(false)
+     }
+   }
+ 
+--- a/src/components/TrustGroupList.tsx
++++ b/src/components/TrustGroupList.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useState } from 'react'
++import { useCallback, useEffect, useState } from 'react'
+ import { getUserTrustGroups, deleteTrustGroup } from '../services/trustGroupService'
+ import { getCurrentUser } from '../services/authService'
+ import type { TrustGroup } from '../types/trustGroup'
+@@ -16,13 +16,14 @@
+   const [selectedGroup, setSelectedGroup] = useState<TrustGroup | null>(null)
+   const [viewMode, setViewMode] = useState<ViewMode>('list')
+   const [isLoading, setIsLoading] = useState(true)
++  const [loadError, setLoadError] = useState('')
+   const [message, setMessage] = useState('')
+   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
+ 
+   const user = getCurrentUser()
+   const userId = user?.id ? Number(user.id) : null
+ 
+-  const loadGroups = async () => {
++  const loadGroups = useCallback(async () => {
+     if (!userId) {
+       setGroups([])
+       setIsLoading(false)
+@@ -30,14 +31,21 @@
+     }
+ 
+     setIsLoading(true)
+-    const userGroups = await getUserTrustGroups(userId)
+-    setGroups(userGroups)
+-    setIsLoading(false)
+-  }
++    setLoadError('')
++    try {
++      setGroups(await getUserTrustGroups(userId))
++    } catch {
++      setLoadError('No se pudieron cargar los datos. Revisa tu conexión.')
++    } finally {
++      setIsLoading(false)
++    }
++  }, [userId])
+ 
+   useEffect(() => {
++    // Carga inicial asíncrona; el estado distingue carga, éxito y error.
++    // eslint-disable-next-line react-hooks/set-state-in-effect
+     void loadGroups()
+-  }, [refreshTrigger, userId])
++  }, [refreshTrigger, loadGroups])
+ 
+ const handleDeleteGroup = async (groupId: number) => {
+   if (!userId) {
+@@ -50,6 +58,7 @@
+     return
+   }
+ 
++    try {
+   const result = await deleteTrustGroup(Number(groupId), userId)
+ 
+   if (result.success) {
+@@ -69,6 +78,10 @@
+   }
+ 
+   setTimeout(() => setMessage(''), 3000)
++    } catch {
++      setMessageType('error')
++      setMessage('No se pudo completar la operación. Revisa tu conexión e inténtalo de nuevo.')
++    }
+ }
+ 
+   const handleSelectGroup = (group: TrustGroup) => {
+@@ -84,6 +97,13 @@
+ 
+   const handleManageMembers = () => {
+     setViewMode('manage')
++  }
++
++  if (loadError) {
++    return <div role="alert" className="p-4 text-uta-red">
++      <p>{loadError}</p>
++      <button type="button" onClick={() => void loadGroups()}>Reintentar</button>
++    </div>
+   }
+ 
+   if (isLoading) {
+@@ -147,6 +167,7 @@
+           )}
+         </div>
+ 
++        {message && <p role="status" className="mb-4 text-uta-red">{message}</p>}
+         <GroupMembersView group={selectedGroup} onMembersChanged={loadGroups} />
+       </div>
+     )
+--- a/src/db/notificationsRepo.ts
++++ b/src/db/notificationsRepo.ts
+@@ -27,11 +27,13 @@
+   },
+ 
+   async markGeneralRead(notificationId: number): Promise<boolean> {
+-    const { error } = await supabase
++    const { data, error } = await supabase
+       .from('notificaciones')
+       .update({ leido: true })
+       .eq('id', notificationId)
+-    return !error
++      .select('id')
++    if (error) throw error
++    return Boolean(data?.length)
+   },
+ 
+   // ---------- Notificaciones de grupo ----------
+@@ -76,25 +78,29 @@
+     memberUserIds: number[]
+   ): Promise<boolean> {
+     if (memberUserIds.length === 0) return false
+-    const rows: TablesInsert<'notificaciones_grupo'>[] = memberUserIds.map(
+-      () => ({
+-        grupo_id: groupId,
+-        incidente_id: incidenteId,
+-        usuario_emisor_id: userIdEmisor,
+-        mensaje: message,
+-        leida: false,
+-      })
+-    )
+-    const { error } = await supabase.from('notificaciones_grupo').insert(rows)
+-    return !error
++    // El esquema almacena avisos por grupo, no por destinatario.
++    // Una fila por miembro duplicaría el mismo aviso en todas las listas.
++    const rows: TablesInsert<'notificaciones_grupo'>[] = [{
++      grupo_id: groupId,
++      incidente_id: incidenteId,
++      usuario_emisor_id: userIdEmisor,
++      mensaje: message,
++      leida: false,
++    }]
++    const { data, error } = await supabase.from('notificaciones_grupo').insert(rows)
++      .select('id')
++    if (error) throw error
++    return Boolean(data?.length)
+   },
+ 
+   async markGroupRead(notificationId: number): Promise<boolean> {
+-    const { error } = await supabase
++    const { data, error } = await supabase
+       .from('notificaciones_grupo')
+       .update({ leida: true })
+       .eq('id', notificationId)
+-    return !error
++      .select('id')
++    if (error) throw error
++    return Boolean(data?.length)
+   },
+ 
+   // ---------- Realtime ----------
+--- a/src/db/trustGroupsRepo.ts
++++ b/src/db/trustGroupsRepo.ts
+@@ -60,11 +60,13 @@
+   },
+ 
+   async deleteById(groupId: number): Promise<boolean> {
+-    const { error } = await supabase
++    const { data, error } = await supabase
+       .from('grupos_confianza')
+       .delete()
+       .eq('id', groupId)
+-    return !error
++      .select('id')
++    if (error) throw error
++    return Boolean(data?.length)
+   },
+ 
+   // ---------- Membresía ----------
+@@ -141,20 +143,24 @@
+   },
+ 
+   async removeMemberById(memberId: number): Promise<boolean> {
+-    const { error } = await supabase
++    const { data, error } = await supabase
+       .from('grupo_miembros')
+       .delete()
+       .eq('id', memberId)
+-    return !error
++      .select('id')
++    if (error) throw error
++    return Boolean(data?.length)
+   },
+ 
+   async removeUserFromGroup(groupId: number, userId: number): Promise<boolean> {
+-    const { error } = await supabase
++    const { data, error } = await supabase
+       .from('grupo_miembros')
+       .delete()
+       .eq('grupo_id', groupId)
+       .eq('usuario_id', userId)
+-    return !error
++      .select('id')
++    if (error) throw error
++    return Boolean(data?.length)
+   },
+ 
+   // ---------- Solicitudes ----------
+@@ -232,11 +238,14 @@
+     requestId: number,
+     estado: 'aceptado' | 'rechazado'
+   ): Promise<boolean> {
+-    const { error } = await supabase
++    const { data, error } = await supabase
+       .from('solicitudes_grupo')
+       .update({ estado })
+       .eq('id', requestId)
+-    return !error
++      .eq('estado', 'pendiente')
++      .select('id')
++    if (error) throw error
++    return Boolean(data?.length)
+   },
+ 
+   async listPendingInvitationsForUser(
+--- /dev/null
++++ b/src/services/createNotificationService.ts
+@@ -0,0 +1,114 @@
++import type {
++  GeneralNotification,
++  GroupNotification,
++  GroupRequest,
++  NotificationSummary,
++} from '../types/trustGroup'
++
++import type { notificationsRepo as NotificationsRepo } from '../db/notificationsRepo'
++import type { trustGroupsRepo as TrustGroupsRepo } from '../db/trustGroupsRepo'
++import type { usersRepo as UsersRepo } from '../db/usersRepo'
++
++export interface NotificationDependencies {
++  notificationsRepo: Pick<typeof NotificationsRepo, 'listForUser' | 'listForGroups' | 'countUnreadForUser' | 'countUnreadForGroups' | 'markGeneralRead' | 'markGroupRead' | 'subscribeToUserNotifications'>
++  trustGroupsRepo: Pick<typeof TrustGroupsRepo, 'getGroupIdsForUser' | 'listPendingInvitationsForUser' | 'findManyByIdSimple'>
++  usersRepo: Pick<typeof UsersRepo, 'findByIds'>
++}
++
++export function createNotificationService({ notificationsRepo, trustGroupsRepo, usersRepo }: NotificationDependencies) {
++const getUserGeneralNotifications = async (
++  userId: number
++): Promise<GeneralNotification[]> => {
++  const rows = await notificationsRepo.listForUser(userId)
++  return rows.map((row) => ({
++    id: row.id,
++    usuario_id: row.usuario_id,
++    incidente_id: row.incidente_id ?? 0,
++    mensaje: row.mensaje,
++    leido: row.leido,
++    fecha: row.fecha,
++  }))
++}
++
++const getUserGroupIds = async (userId: number): Promise<number[]> => {
++  return await trustGroupsRepo.getGroupIdsForUser(userId)
++}
++
++const getUserGroupNotifications = async (
++  userId: number
++): Promise<GroupNotification[]> => {
++  const grupoIds = await getUserGroupIds(userId)
++  if (grupoIds.length === 0) return []
++  return await notificationsRepo.listForGroups(grupoIds, userId)
++}
++
++const getPendingInvitesForUser = async (
++  userId: number
++): Promise<GroupRequest[]> => {
++  const requests = await trustGroupsRepo.listPendingInvitationsForUser(userId)
++  if (requests.length === 0) return []
++
++  const grupoIds = requests.map((request) => request.grupo_id)
++  const solicitanteIds = requests.map((request) => request.usuario_solicitante_id)
++
++  const [groups, users] = await Promise.all([
++    trustGroupsRepo.findManyByIdSimple(grupoIds),
++    usersRepo.findByIds(solicitanteIds),
++  ])
++
++  const groupMap = new Map(groups.map((group) => [group.id, group]))
++  const userMap = new Map(users.map((user) => [user.id, user]))
++
++  return requests.map((request) => ({
++    id: request.id,
++    grupo_id: request.grupo_id,
++    usuario_invitado_id: userId,
++    usuario_solicitante_id: request.usuario_solicitante_id,
++    estado: 'pendiente',
++    mensaje: request.mensaje ?? undefined,
++    created_at: request.created_at,
++    grupo_nombre: groupMap.get(request.grupo_id)?.nombre,
++    solicitante_nombre: userMap.get(request.usuario_solicitante_id)?.nombre,
++  }))
++}
++
++const getNotificationSummary = async (
++  userId: number
++): Promise<NotificationSummary> => {
++  const grupoIds = await getUserGroupIds(userId)
++  const [unreadGeneral, unreadGroup, pendingInvites] = await Promise.all([
++    notificationsRepo.countUnreadForUser(userId),
++    grupoIds.length > 0
++      ? notificationsRepo.countUnreadForGroups(grupoIds, userId)
++      : Promise.resolve(0),
++    trustGroupsRepo.listPendingInvitationsForUser(userId).then((rows) => rows.length),
++  ])
++
++  return {
++    pendingInvites,
++    unreadGeneral,
++    unreadGroup,
++  }
++}
++
++const markGeneralNotificationRead = async (
++  notificationId: number
++): Promise<boolean> => {
++  return await notificationsRepo.markGeneralRead(notificationId)
++}
++
++const markGroupNotificationRead = async (
++  notificationId: number
++): Promise<boolean> => {
++  return await notificationsRepo.markGroupRead(notificationId)
++}
++
++const subscribeToNotificationChannels = (
++  userId: number,
++  callback: () => void
++): { unsubscribe: () => Promise<void> } => {
++  return notificationsRepo.subscribeToUserNotifications(userId, callback)
++}
++
++  return { getUserGeneralNotifications, getUserGroupNotifications, getPendingInvitesForUser, getNotificationSummary, markGeneralNotificationRead, markGroupNotificationRead, subscribeToNotificationChannels }
++}
+--- a/src/services/notificationService.ts
++++ b/src/services/notificationService.ts
+@@ -1,138 +1,16 @@
+ import { notificationsRepo } from '../db/notificationsRepo'
+ import { trustGroupsRepo } from '../db/trustGroupsRepo'
+ import { usersRepo } from '../db/usersRepo'
+-import type {
+-  GeneralNotification,
+-  GroupNotification,
+-  GroupRequest,
+-  NotificationSummary,
+-} from '../types/trustGroup'
++import { createNotificationService } from './createNotificationService'
+ 
+-export const getUserGeneralNotifications = async (
+-  userId: number
+-): Promise<GeneralNotification[]> => {
+-  try {
+-    const rows = await notificationsRepo.listForUser(userId)
+-    return rows.map((row) => ({
+-      id: row.id,
+-      usuario_id: row.usuario_id,
+-      incidente_id: row.incidente_id ?? 0,
+-      mensaje: row.mensaje,
+-      leido: row.leido,
+-      fecha: row.fecha,
+-    }))
+-  } catch (error) {
+-    console.error('Error al obtener notificaciones generales:', error)
+-    return []
+-  }
+-}
++export { createNotificationService } from './createNotificationService'
+ 
+-const getUserGroupIds = async (userId: number): Promise<number[]> => {
+-  try {
+-    return await trustGroupsRepo.getGroupIdsForUser(userId)
+-  } catch (error) {
+-    console.error('Error al obtener grupos de usuario:', error)
+-    return []
+-  }
+-}
+-
+-export const getUserGroupNotifications = async (
+-  userId: number
+-): Promise<GroupNotification[]> => {
+-  try {
+-    const grupoIds = await getUserGroupIds(userId)
+-    if (grupoIds.length === 0) return []
+-    return await notificationsRepo.listForGroups(grupoIds, userId)
+-  } catch (error) {
+-    console.error('Error al obtener notificaciones de grupo:', error)
+-    return []
+-  }
+-}
+-
+-export const getPendingInvitesForUser = async (
+-  userId: number
+-): Promise<GroupRequest[]> => {
+-  try {
+-    const requests = await trustGroupsRepo.listPendingInvitationsForUser(userId)
+-    if (requests.length === 0) return []
+-
+-    const grupoIds = requests.map((request) => request.grupo_id)
+-    const solicitanteIds = requests.map((request) => request.usuario_solicitante_id)
+-
+-    const [groups, users] = await Promise.all([
+-      trustGroupsRepo.findManyByIdSimple(grupoIds),
+-      usersRepo.findByIds(solicitanteIds),
+-    ])
+-
+-    const groupMap = new Map(groups.map((group) => [group.id, group]))
+-    const userMap = new Map(users.map((user) => [user.id, user]))
+-
+-    return requests.map((request) => ({
+-      id: request.id,
+-      grupo_id: request.grupo_id,
+-      usuario_invitado_id: userId,
+-      usuario_solicitante_id: request.usuario_solicitante_id,
+-      estado: 'pendiente',
+-      mensaje: request.mensaje ?? undefined,
+-      created_at: request.created_at,
+-      grupo_nombre: groupMap.get(request.grupo_id)?.nombre,
+-      solicitante_nombre: userMap.get(request.usuario_solicitante_id)?.nombre,
+-    }))
+-  } catch (error) {
+-    console.error('Error al obtener solicitudes de grupo:', error)
+-    return []
+-  }
+-}
+-
+-export const getNotificationSummary = async (
+-  userId: number
+-): Promise<NotificationSummary> => {
+-  try {
+-    const grupoIds = await getUserGroupIds(userId)
+-    const [unreadGeneral, unreadGroup, pendingInvites] = await Promise.all([
+-      notificationsRepo.countUnreadForUser(userId),
+-      grupoIds.length > 0
+-        ? notificationsRepo.countUnreadForGroups(grupoIds, userId)
+-        : Promise.resolve(0),
+-      trustGroupsRepo.listPendingInvitationsForUser(userId).then((rows) => rows.length),
+-    ])
+-
+-    return {
+-      pendingInvites,
+-      unreadGeneral,
+-      unreadGroup,
+-    }
+-  } catch (error) {
+-    console.error('Error al obtener resumen de notificaciones:', error)
+-    return { pendingInvites: 0, unreadGeneral: 0, unreadGroup: 0 }
+-  }
+-}
+-
+-export const markGeneralNotificationRead = async (
+-  notificationId: number
+-): Promise<boolean> => {
+-  try {
+-    return await notificationsRepo.markGeneralRead(notificationId)
+-  } catch (error) {
+-    console.error('Error al marcar notificación general como leída:', error)
+-    return false
+-  }
+-}
+-
+-export const markGroupNotificationRead = async (
+-  notificationId: number
+-): Promise<boolean> => {
+-  try {
+-    return await notificationsRepo.markGroupRead(notificationId)
+-  } catch (error) {
+-    console.error('Error al marcar notificación de grupo como leída:', error)
+-    return false
+-  }
+-}
+-
+-export const subscribeToNotificationChannels = (
+-  userId: number,
+-  callback: () => void
+-): { unsubscribe: () => Promise<void> } => {
+-  return notificationsRepo.subscribeToUserNotifications(userId, callback)
+-}
++export const {
++  getUserGeneralNotifications,
++  getUserGroupNotifications,
++  getPendingInvitesForUser,
++  getNotificationSummary,
++  markGeneralNotificationRead,
++  markGroupNotificationRead,
++  subscribeToNotificationChannels
++} = createNotificationService({ notificationsRepo, trustGroupsRepo, usersRepo })
+--- a/src/services/trustGroupService.ts
++++ b/src/services/trustGroupService.ts
+@@ -1,7 +1,6 @@
+ import { trustGroupsRepo } from '../db/trustGroupsRepo'
+ import { usersRepo } from '../db/usersRepo'
+ import { notificationsRepo } from '../db/notificationsRepo'
+-import { supabase } from './supabaseClient'
+ import type {
+   TrustGroup,
+   TrustGroupMember,
+@@ -13,67 +12,49 @@
+   userId: number | null,
+   data: CreateTrustGroupData
+ ): Promise<TrustGroupResult> => {
+-  try {
+-    if (!userId) return { success: false, message: 'Usuario no autenticado.' }
+-
+-    const group = await trustGroupsRepo.create(userId, {
+-      nombre: data.nombre,
+-      descripcion: data.descripcion ?? null,
+-    })
+-
+-    await trustGroupsRepo.addMember(group.id, userId, 'admin')
+-
+-    return { success: true, message: 'Grupo creado exitosamente.', data: group }
+-  } catch (error) {
+-    console.error('Error al crear grupo:', error)
+-    return { success: false, message: 'Error al crear el grupo.' }
+-  }
++  if (!userId) return { success: false, message: 'Usuario no autenticado.' }
++
++  if (!data.nombre.trim()) return { success: false, message: 'El nombre del grupo es obligatorio.' }
++
++  const group = await trustGroupsRepo.create(userId, {
++    nombre: data.nombre,
++    descripcion: data.descripcion ?? null,
++  })
++
++  // El trigger de creación inserta al administrador en la misma transacción.
++
++  return { success: true, message: 'Grupo creado exitosamente.', data: group }
+ }
+ 
+ export const getUserTrustGroups = async (userId: number): Promise<TrustGroup[]> => {
+-  try {
+-    const groupIds = await trustGroupsRepo.getGroupIdsForUser(userId)
+-    if (groupIds.length === 0) return []
+-    return await trustGroupsRepo.findManyByIds(groupIds)
+-  } catch (error) {
+-    console.error('Error al obtener grupos:', error)
+-    return []
+-  }
++  const groupIds = await trustGroupsRepo.getGroupIdsForUser(userId)
++  if (groupIds.length === 0) return []
++  return await trustGroupsRepo.findManyByIds(groupIds)
+ }
+ 
+ export const getTrustGroup = async (groupId: number): Promise<TrustGroup | null> => {
+-  try {
+-    return await trustGroupsRepo.findById(groupId)
+-  } catch (error) {
+-    console.error('Error al obtener grupo:', error)
+-    return null
+-  }
++  return await trustGroupsRepo.findById(groupId)
+ }
+ 
+ export const getGroupMembers = async (groupId: number): Promise<TrustGroupMember[]> => {
+-  try {
+-    const members = await trustGroupsRepo.listMembers(groupId)
+-    if (members.length === 0) return []
+-
+-    const userIds = members.map((member) => member.usuario_id)
+-    const users = await usersRepo.findByIds(userIds)
+-
+-    const userMap = new Map(users.map((user) => [user.id, user]))
+-    return members.map((member) => ({
+-      ...member,
+-      rol: member.rol as 'admin' | 'miembro',
+-      usuario: userMap.get(member.usuario_id)
+-        ? {
+-            id: userMap.get(member.usuario_id)!.id,
+-            nombre: userMap.get(member.usuario_id)!.nombre,
+-            correo: userMap.get(member.usuario_id)!.correo,
+-          }
+-        : undefined,
+-    }))
+-  } catch (error) {
+-    console.error('Error al obtener miembros:', error)
+-    return []
+-  }
++  const members = await trustGroupsRepo.listMembers(groupId)
++  if (members.length === 0) return []
++
++  const userIds = members.map((member) => member.usuario_id)
++  const users = await usersRepo.findByIds(userIds)
++
++  const userMap = new Map(users.map((user) => [user.id, user]))
++  return members.map((member) => ({
++    ...member,
++    rol: member.rol as 'admin' | 'miembro',
++    usuario: userMap.get(member.usuario_id)
++      ? {
++          id: userMap.get(member.usuario_id)!.id,
++          nombre: userMap.get(member.usuario_id)!.nombre,
++          correo: userMap.get(member.usuario_id)!.correo,
++        }
++      : undefined,
++  }))
+ }
+ 
+ export const getGroupMembershipRole = async (
+@@ -101,49 +82,47 @@
+   requesterId: number,
+   message?: string
+ ): Promise<TrustGroupResult> => {
+-  try {
+-    const email = invitedEmail.trim().toLowerCase()
+-
+-    const invitedUser = await usersRepo.findByEmail(email)
+-    if (!invitedUser) {
+-      return { success: false, message: 'No se encontró un usuario con ese correo.' }
++  if (await trustGroupsRepo.getRoleInGroup(groupId, requesterId) !== 'admin') {
++    return { success: false, message: 'Solo el admin puede invitar miembros.' }
++  }
++  const email = invitedEmail.trim().toLowerCase()
++
++  const invitedUser = await usersRepo.findByEmail(email)
++  if (!invitedUser) {
++    return { success: false, message: 'No se encontró un usuario con ese correo.' }
++  }
++
++  if (invitedUser.id === requesterId) {
++    return { success: false, message: 'No puedes invitarte a ti mismo.' }
++  }
++
++  const existingMember = await trustGroupsRepo.findExistingMembership(
++    groupId,
++    invitedUser.id
++  )
++  if (existingMember) {
++    return { success: false, message: 'Este usuario ya es miembro del grupo.' }
++  }
++
++  const existingRequest = await trustGroupsRepo.findPendingInvitation(
++    groupId,
++    invitedUser.id
++  )
++  if (existingRequest) {
++    return {
++      success: false,
++      message: 'Ya existe una solicitud pendiente para este usuario.',
+     }
+-
+-    if (invitedUser.id === requesterId) {
+-      return { success: false, message: 'No puedes invitarte a ti mismo.' }
+-    }
+-
+-    const existingMember = await trustGroupsRepo.findExistingMembership(
+-      groupId,
+-      invitedUser.id
+-    )
+-    if (existingMember) {
+-      return { success: false, message: 'Este usuario ya es miembro del grupo.' }
+-    }
+-
+-    const existingRequest = await trustGroupsRepo.findPendingInvitation(
+-      groupId,
+-      invitedUser.id
+-    )
+-    if (existingRequest) {
+-      return {
+-        success: false,
+-        message: 'Ya existe una solicitud pendiente para este usuario.',
+-      }
+-    }
+-
+-    await trustGroupsRepo.createInvitation({
+-      grupoId: groupId,
+-      invitedUserId: invitedUser.id,
+-      requesterId,
+-      mensaje: message,
+-    })
+-
+-    return { success: true, message: 'Solicitud enviada correctamente.' }
+-  } catch (error) {
+-    console.error('Error al crear solicitud:', error)
+-    return { success: false, message: 'Error al enviar solicitud.' }
+-  }
++  }
++
++  await trustGroupsRepo.createInvitation({
++    grupoId: groupId,
++    invitedUserId: invitedUser.id,
++    requesterId,
++    mensaje: message,
++  })
++
++  return { success: true, message: 'Solicitud enviada correctamente.' }
+ }
+ 
+ export const respondToGroupInvitation = async (
+@@ -151,101 +130,82 @@
+   userId: number,
+   accept: boolean
+ ): Promise<TrustGroupResult> => {
+-  try {
+-    const request = await trustGroupsRepo.findPendingRequest(requestId, userId)
+-    if (!request) {
+-      return { success: false, message: 'Solicitud no encontrada.' }
+-    }
+-
+-    if (!accept) {
+-      await trustGroupsRepo.updateRequestStatus(requestId, 'rechazado')
+-      return { success: true, message: 'Solicitud rechazada.' }
+-    }
+-
+-    await trustGroupsRepo.addMember(request.grupo_id, userId, 'miembro')
+-    await trustGroupsRepo.updateRequestStatus(requestId, 'aceptado')
+-
+-    return { success: true, message: 'Solicitud aceptada.' }
+-  } catch (error) {
+-    console.error('Error al responder solicitud:', error)
+-    return { success: false, message: 'Error al procesar la solicitud.' }
+-  }
++  const request = await trustGroupsRepo.findPendingRequest(requestId, userId)
++  if (!request) {
++    return { success: false, message: 'Solicitud no encontrada.' }
++  }
++
++  // El trigger inserta la membresía dentro de la actualización si se acepta.
++  const updated = await trustGroupsRepo.updateRequestStatus(
++    requestId, accept ? 'aceptado' : 'rechazado'
++  )
++  if (!updated) return { success: false, message: 'La solicitud ya no está pendiente.' }
++  return { success: true, message: accept ? 'Solicitud aceptada.' : 'Solicitud rechazada.' }
+ }
+ 
+ export const removeMember = async (
+   memberId: number,
+   currentUserId: number
+ ): Promise<TrustGroupResult> => {
+-  try {
+-    const member = await trustGroupsRepo.findMemberById(memberId)
+-    if (!member) return { success: false, message: 'Miembro no encontrado.' }
+-
+-    const currentRole = await trustGroupsRepo.getRoleInGroup(
+-      member.grupo_id,
+-      currentUserId
+-    )
+-    if (currentRole !== 'admin') {
+-      return { success: false, message: 'Solo el admin puede eliminar miembros.' }
+-    }
+-
+-    const ok = await trustGroupsRepo.removeMemberById(memberId)
+-    if (!ok) return { success: false, message: 'No se pudo eliminar el miembro.' }
+-
+-    return { success: true, message: 'Miembro eliminado.' }
+-  } catch (error) {
+-    console.error('Error al eliminar miembro:', error)
+-    return { success: false, message: 'Error al eliminar miembro.' }
+-  }
++  const member = await trustGroupsRepo.findMemberById(memberId)
++  if (!member) return { success: false, message: 'Miembro no encontrado.' }
++
++  const currentRole = await trustGroupsRepo.getRoleInGroup(
++    member.grupo_id,
++    currentUserId
++  )
++  if (currentRole !== 'admin') {
++    return { success: false, message: 'Solo el admin puede eliminar miembros.' }
++  }
++
++  if (member.rol === 'admin' && await trustGroupsRepo.countAdmins(member.grupo_id) <= 1) {
++    return { success: false, message: 'No puedes eliminar al único admin.' }
++  }
++
++  const ok = await trustGroupsRepo.removeMemberById(memberId)
++  if (!ok) return { success: false, message: 'No se pudo eliminar el miembro.' }
++
++  return { success: true, message: 'Miembro eliminado.' }
+ }
+ 
+ export const leaveGroup = async (
+   groupId: number,
+   userId: number
+ ): Promise<TrustGroupResult> => {
+-  try {
+-    const role = await trustGroupsRepo.getRoleInGroup(groupId, userId)
+-    if (!role) {
+-      return { success: false, message: 'No eres miembro de este grupo.' }
+-    }
+-
+-    if (role === 'admin') {
+-      const adminCount = await trustGroupsRepo.countAdmins(groupId)
+-      if (adminCount <= 1) {
+-        return {
+-          success: false,
+-          message: 'No puedes salir si eres el único admin.',
+-        }
++  const role = await trustGroupsRepo.getRoleInGroup(groupId, userId)
++  if (!role) {
++    return { success: false, message: 'No eres miembro de este grupo.' }
++  }
++
++  if (role === 'admin') {
++    const adminCount = await trustGroupsRepo.countAdmins(groupId)
++    if (adminCount <= 1) {
++      return {
++        success: false,
++        message: 'No puedes salir si eres el único admin.',
+       }
+     }
+-
+-    const ok = await trustGroupsRepo.removeUserFromGroup(groupId, userId)
+-    if (!ok) return { success: false, message: 'No se pudo salir del grupo.' }
+-
+-    return { success: true, message: 'Saliste del grupo.' }
+-  } catch (error) {
+-    console.error('Error al salir del grupo:', error)
+-    return { success: false, message: 'Error al salir del grupo.' }
+-  }
++  }
++
++  const ok = await trustGroupsRepo.removeUserFromGroup(groupId, userId)
++  if (!ok) return { success: false, message: 'No se pudo salir del grupo.' }
++
++  return { success: true, message: 'Saliste del grupo.' }
+ }
+ 
+ export const deleteTrustGroup = async (
+   groupId: number,
+   currentUserId: number
+ ): Promise<TrustGroupResult> => {
+-  try {
+-    const role = await trustGroupsRepo.getRoleInGroup(groupId, currentUserId)
+-    if (role !== 'admin') {
+-      return { success: false, message: 'Solo el admin puede eliminar el grupo.' }
+-    }
+-
+-    const ok = await trustGroupsRepo.deleteById(groupId)
+-    if (!ok) return { success: false, message: 'No se pudo eliminar el grupo.' }
+-
+-    return { success: true, message: 'Grupo eliminado.' }
+-  } catch (error) {
+-    console.error('Error al eliminar grupo:', error)
+-    return { success: false, message: 'Error al eliminar el grupo.' }
+-  }
++  const role = await trustGroupsRepo.getRoleInGroup(groupId, currentUserId)
++  if (role !== 'admin') {
++    return { success: false, message: 'Solo el admin puede eliminar el grupo.' }
++  }
++
++  const ok = await trustGroupsRepo.deleteById(groupId)
++  if (!ok) return { success: false, message: 'No se pudo eliminar el grupo.' }
++
++  return { success: true, message: 'Grupo eliminado.' }
+ }
+ 
+ export const notifyGroupMembers = async (
+@@ -254,45 +214,23 @@
+   userIdEmitter: number,
+   message: string
+ ): Promise<boolean> => {
+-  try {
+-    const { data: members, error } = await supabase
+-      .from('grupo_miembros')
+-      .select('usuario_id')
+-      .eq('grupo_id', groupId)
+-      .neq('usuario_id', userIdEmitter)
+-
+-    if (error || !members || members.length === 0) return false
+-
+-    const memberUserIds = members.map((m) => m.usuario_id)
+-    return await notificationsRepo.notifyGroupMembers(
+-      groupId,
+-      incidentId,
+-      userIdEmitter,
+-      message,
+-      memberUserIds
+-    )
+-  } catch (error) {
+-    console.error('Error al notificar grupo:', error)
+-    return false
+-  }
++  const members = (await trustGroupsRepo.listMembers(groupId))
++    .filter(member => member.usuario_id !== userIdEmitter)
++  if (members.length === 0) return false
++
++  const memberUserIds = members.map((m) => m.usuario_id)
++  return await notificationsRepo.notifyGroupMembers(
++    groupId,
++    incidentId,
++    userIdEmitter,
++    message,
++    memberUserIds
++  )
+ }
+ 
+ export const getUnreadNotifications = async (userId: number) => {
+-  try {
+-    return await trustGroupsRepo.listPendingInvitationsForUser(userId)
+-  } catch (error) {
+-    console.error('Error al obtener notificaciones:', error)
+-    return []
+-  }
+-}
+-
+-export const markNotificationAsRead = async (
+-  notificationId: number
+-): Promise<boolean> => {
+-  try {
+-    return await notificationsRepo.markGroupRead(notificationId)
+-  } catch (error) {
+-    console.error('Error al marcar notificación:', error)
+-    return false
+-  }
+-}
++  return await trustGroupsRepo.listPendingInvitationsForUser(userId)
++}
++
++// Alias compatible: una sola implementación para marcar notificaciones de grupo.
++export { markGroupNotificationRead as markNotificationAsRead } from './notificationService'
+--- /dev/null
++++ b/supabase/migrations/20260926223000_miembro2_atomicidad.sql
+@@ -0,0 +1,38 @@
++-- Miembro 2. Ejecutar antes de iniciar el frontend refactorizado.
++-- SECURITY INVOKER: conserva los permisos/RLS existentes.
++begin;
++
++create or replace function public.m2_create_group_admin()
++returns trigger language plpgsql security invoker set search_path = public as $$
++begin
++  insert into public.grupo_miembros (grupo_id, usuario_id, rol)
++  values (new.id, new.usuario_creador_id, 'admin');
++  return new;
++end;
++$$;
++
++create trigger m2_group_admin
++  after insert on public.grupos_confianza
++  for each row execute function public.m2_create_group_admin();
++
++-- Una aceptación y su membresía se confirman o revierten juntas.
++create or replace function public.m2_accept_invitation()
++returns trigger language plpgsql security invoker set search_path = public as $$
++begin
++  if old.estado <> 'pendiente' and new.estado <> old.estado then
++    raise exception 'La solicitud ya fue respondida';
++  end if;
++  if old.estado = 'pendiente' and new.estado = 'aceptado' then
++    insert into public.grupo_miembros (grupo_id, usuario_id, rol)
++    values (new.grupo_id, new.usuario_invitado_id, 'miembro')
++    on conflict (grupo_id, usuario_id) do nothing;
++  end if;
++  return new;
++end;
++$$;
++
++create trigger m2_invitation_membership
++  before update of estado on public.solicitudes_grupo
++  for each row execute function public.m2_accept_invitation();
++
++commit;
+--- /dev/null
++++ b/tests/miembro2-sql.mjs
+@@ -0,0 +1,29 @@
++import { PGlite } from '@electric-sql/pglite'
++import { readFileSync } from 'node:fs'
++import assert from 'node:assert/strict'
++const db = new PGlite()
++await db.exec('create role anon; create role authenticated; create role service_role;')
++await db.exec(readFileSync(new URL('../supabase/migrations/20260922120000_init_schema.sql', import.meta.url),'utf8'))
++await db.exec(readFileSync(new URL('../supabase/migrations/20260926223000_miembro2_atomicidad.sql', import.meta.url),'utf8'))
++await db.exec("insert into usuarios (nombre,correo,password) values ('A','a@test','x'),('B','b@test','x');")
++await db.exec("insert into grupos_confianza (usuario_creador_id,nombre) values (1,'Normal');")
++assert.equal((await db.query("select count(*)::int n from grupo_miembros where grupo_id=1 and usuario_id=1 and rol='admin'")).rows[0].n,1)
++console.log('PASS creación con administrador')
++await db.exec(`create function fail_member() returns trigger language plpgsql as $$ begin raise exception 'Fallo simulado'; end $$;
++create trigger injected_failure before insert on grupo_miembros for each row execute function fail_member();`)
++await assert.rejects(db.exec("insert into grupos_confianza (usuario_creador_id,nombre) values (1,'Debe revertirse')"))
++assert.equal((await db.query("select count(*)::int n from grupos_confianza where nombre='Debe revertirse'")).rows[0].n,0)
++console.log('PASS rollback completo si falla el administrador')
++await db.exec("insert into solicitudes_grupo(grupo_id,usuario_invitado_id,usuario_solicitante_id) values (1,2,1)")
++await assert.rejects(db.exec("update solicitudes_grupo set estado='aceptado' where id=1"))
++assert.equal((await db.query('select estado from solicitudes_grupo where id=1')).rows[0].estado,'pendiente')
++console.log('PASS aceptación fallida conserva solicitud pendiente')
++await db.exec('drop trigger injected_failure on grupo_miembros')
++await db.exec("update solicitudes_grupo set estado='aceptado' where id=1")
++assert.equal((await db.query('select count(*)::int n from grupo_miembros where usuario_id=2')).rows[0].n,1)
++await db.exec("update solicitudes_grupo set estado='aceptado' where id=1")
++assert.equal((await db.query('select count(*)::int n from grupo_miembros where usuario_id=2')).rows[0].n,1)
++console.log('PASS aceptación crea una sola membresía')
++await assert.rejects(db.exec("update solicitudes_grupo set estado='rechazado' where id=1"))
++console.log('PASS no cambia una solicitud ya respondida')
++await db.close()
+--- /dev/null
++++ b/tests/miembro2.test.mjs
+@@ -0,0 +1,71 @@
++import { test } from 'node:test'
++import assert from 'node:assert/strict'
++import { readFileSync } from 'node:fs'
++import ts from 'typescript'
++
++// Carga únicamente la fábrica pura; no necesita .env, Supabase ni conexión.
++const source = readFileSync(new URL('../src/services/createNotificationService.ts', import.meta.url), 'utf8')
++const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText
++const { createNotificationService } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`)
++function ports() {
++  return {
++    notificationsRepo: {
++      listForUser: async () => [], listForGroups: async () => [],
++      countUnreadForUser: async () => 0, countUnreadForGroups: async () => 0,
++      markGeneralRead: async () => true, markGroupRead: async () => true,
++      subscribeToUserNotifications: () => ({ unsubscribe: async () => {} }),
++    },
++    trustGroupsRepo: {
++      getGroupIdsForUser: async () => [10],
++      listPendingInvitationsForUser: async () => [], findManyByIdSimple: async () => [],
++    },
++    usersRepo: { findByIds: async () => [] },
++  }
++}
++for (const [method, repo, failing] of [
++  ['getUserGeneralNotifications', 'notificationsRepo', 'listForUser'],
++  ['getUserGroupNotifications', 'notificationsRepo', 'listForGroups'],
++  ['getUserGroupNotifications', 'trustGroupsRepo', 'getGroupIdsForUser'],
++  ['getPendingInvitesForUser', 'trustGroupsRepo', 'listPendingInvitationsForUser'],
++  ['getNotificationSummary', 'notificationsRepo', 'countUnreadForUser'],
++  ['getNotificationSummary', 'notificationsRepo', 'countUnreadForGroups'],
++  ['getNotificationSummary', 'trustGroupsRepo', 'listPendingInvitationsForUser'],
++  ['markGeneralNotificationRead', 'notificationsRepo', 'markGeneralRead'],
++  ['markGroupNotificationRead', 'notificationsRepo', 'markGroupRead'],
++]) {
++  test(`${method} propaga el fallo de ${failing}`, async () => {
++    const deps = ports(); const failure = new Error('Conexión interrumpida')
++    deps[repo][failing] = async () => { throw failure }
++    await assert.rejects(createNotificationService(deps)[method](1), error => error === failure)
++  })
++}
++test('Una consulta exitosa sin datos sí devuelve vacío', async () => {
++  const service = createNotificationService(ports())
++  assert.deepEqual(await service.getUserGeneralNotifications(1), [])
++  assert.deepEqual(await service.getNotificationSummary(1), { pendingInvites: 0, unreadGeneral: 0, unreadGroup: 0 })
++})
++test('El resumen combina los tres orígenes', async () => {
++  const deps = ports()
++  deps.notificationsRepo.countUnreadForUser = async () => 2
++  deps.notificationsRepo.countUnreadForGroups = async () => 3
++  deps.trustGroupsRepo.listPendingInvitationsForUser = async () => [{ id: 1 }]
++  assert.deepEqual(await createNotificationService(deps).getNotificationSummary(1), { pendingInvites: 1, unreadGeneral: 2, unreadGroup: 3 })
++})
++test('Sin grupos no consulta notificaciones de grupo', async () => {
++  const deps = ports(); deps.trustGroupsRepo.getGroupIdsForUser = async () => []
++  deps.notificationsRepo.listForGroups = async () => { throw new Error('No debe ejecutarse') }
++  assert.deepEqual(await createNotificationService(deps).getUserGroupNotifications(1), [])
++})
++test('Un registro inexistente conserva false, distinto de error', async () => {
++  const deps = ports(); deps.notificationsRepo.markGroupRead = async () => false
++  assert.equal(await createNotificationService(deps).markGroupNotificationRead(99), false)
++})
++test('La suscripción delega usuario y libera el recurso', async () => {
++  const deps = ports(); let removed = false; const callback = () => {}
++  deps.notificationsRepo.subscribeToUserNotifications = (id, cb) => {
++    assert.equal(id, 7); assert.equal(cb, callback)
++    return { unsubscribe: async () => { removed = true } }
++  }
++  await createNotificationService(deps).subscribeToNotificationChannels(7, callback).unsubscribe()
++  assert.equal(removed, true)
++})

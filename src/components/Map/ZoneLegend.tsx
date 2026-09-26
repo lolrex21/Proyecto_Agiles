@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import type { ZonePolygon } from '../../services/polygonService'
 
 interface ZoneLegendProps {

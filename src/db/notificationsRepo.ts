@@ -27,11 +27,13 @@ export const notificationsRepo = {
   },
 
   async markGeneralRead(notificationId: number): Promise<boolean> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('notificaciones')
       .update({ leido: true })
       .eq('id', notificationId)
-    return !error
+      .select('id')
+    if (error) throw error
+    return Boolean(data?.length)
   },
 
   // ---------- Notificaciones de grupo ----------
@@ -76,25 +78,29 @@ export const notificationsRepo = {
     memberUserIds: number[]
   ): Promise<boolean> {
     if (memberUserIds.length === 0) return false
-    const rows: TablesInsert<'notificaciones_grupo'>[] = memberUserIds.map(
-      () => ({
-        grupo_id: groupId,
-        incidente_id: incidenteId,
-        usuario_emisor_id: userIdEmisor,
-        mensaje: message,
-        leida: false,
-      })
-    )
-    const { error } = await supabase.from('notificaciones_grupo').insert(rows)
-    return !error
+    // El esquema almacena avisos por grupo, no por destinatario.
+    // Una fila por miembro duplicaría el mismo aviso en todas las listas.
+    const rows: TablesInsert<'notificaciones_grupo'>[] = [{
+      grupo_id: groupId,
+      incidente_id: incidenteId,
+      usuario_emisor_id: userIdEmisor,
+      mensaje: message,
+      leida: false,
+    }]
+    const { data, error } = await supabase.from('notificaciones_grupo').insert(rows)
+      .select('id')
+    if (error) throw error
+    return Boolean(data?.length)
   },
 
   async markGroupRead(notificationId: number): Promise<boolean> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('notificaciones_grupo')
       .update({ leida: true })
       .eq('id', notificationId)
-    return !error
+      .select('id')
+    if (error) throw error
+    return Boolean(data?.length)
   },
 
   // ---------- Realtime ----------

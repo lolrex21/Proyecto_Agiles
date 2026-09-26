@@ -71,6 +71,7 @@ export default function TrustGroupForm({ onSuccess }: TrustGroupFormProps) {
       descripcion: formData.descripcion || undefined,
     }
 
+    try {
     const result = await createTrustGroup(userId, data)
 
     setIsSubmitting(false)
@@ -87,6 +88,12 @@ export default function TrustGroupForm({ onSuccess }: TrustGroupFormProps) {
     } else {
       setMessageType('error')
       setMessage(result.message)
+    }
+    } catch {
+      setMessageType('error')
+      setMessage('No se pudo completar la operación. Revisa tu conexión e inténtalo de nuevo.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 

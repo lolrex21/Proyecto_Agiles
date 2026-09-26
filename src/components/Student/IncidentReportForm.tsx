@@ -138,22 +138,27 @@ export default function IncidentReportForm() {
       setActiveIncidentId(Number(newIncident.id))
       emergencySocket.createIncident(newIncident)
 
-      // Notificar a los grupos de confianza
-      if (user?.id) {
-        const userId = Number(user.id)
-        const groups = await getUserTrustGroups(userId)
-        for (const group of groups) {
-          await notifyGroupMembers(
-            Number(group.id),
-            Number(newIncident.id),
-            userId,
-            `🚨 ${user?.nombre || 'Un usuario'} reportó una emergencia en el grupo ${group.nombre}`
-          )
+      // El incidente ya existe: un fallo de notificaciones no debe invitar a reenviarlo.
+      let groupNotificationFailed = false
+      try {
+        if (user?.id) {
+          const userId = Number(user.id)
+          const groups = await getUserTrustGroups(userId)
+          const results = await Promise.allSettled(groups.map(group =>
+            notifyGroupMembers(
+              Number(group.id), Number(newIncident.id), userId,
+              `🚨 ${user?.nombre || 'Un usuario'} reportó una emergencia en el grupo ${group.nombre}`
+            )
+          ))
+          groupNotificationFailed = results.some(result => result.status === 'rejected')
         }
+      } catch {
+        groupNotificationFailed = true
       }
 
-      setStatusMessage(
-        'Emergencia enviada. El guardia ya fue alertado con tu ubicación. Si quieres, agrega detalles abajo.'
+      setStatusMessage(groupNotificationFailed
+        ? 'Emergencia enviada al guardia, pero no se pudo confirmar el aviso a todos tus grupos. Puedes agregar detalles abajo.'
+        : 'Emergencia enviada. El guardia ya fue alertado con tu ubicación. Si quieres, agrega detalles abajo.'
       )
       setPhase('form')
     } catch (err) {

@@ -1,6 +1,10 @@
 import type { GeneralNotification, GroupNotification, GroupRequest } from '../types/trustGroup'
 
 interface NotificationPanelProps {
+  loading: boolean
+  error: string
+  busy: boolean
+  onRetry: () => Promise<void>
   pendingInvites: GroupRequest[]
   generalNotifications: GeneralNotification[]
   groupNotifications: GroupNotification[]
@@ -11,6 +15,7 @@ interface NotificationPanelProps {
 }
 
 export default function NotificationPanel({
+  loading, error, busy, onRetry,
   pendingInvites,
   generalNotifications,
   groupNotifications,
@@ -31,14 +36,19 @@ export default function NotificationPanel({
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
         <div>
           <p className="text-sm font-semibold text-uta-navy">Notificaciones</p>
-          <p className="text-xs text-gray-500">Actualizado en tiempo real</p>
+          <p className="text-xs text-gray-500">{loading ? 'Actualizando…' : error ? 'Actualización pendiente' : 'Notificaciones'}</p>
         </div>
         <button type="button" onClick={onClose} className="text-gray-500 hover:text-uta-navy">
           Cerrar
         </button>
       </div>
 
-      <div className="max-h-[70vh] overflow-y-auto space-y-4 p-4">
+      {error && <div role="alert" className="p-4 text-uta-red">
+        <p>{error}</p>
+        <button type="button" disabled={loading || busy} onClick={() => void onRetry()}>Reintentar</button>
+      </div>}
+      {loading && <p role="status" className="p-4">Cargando notificaciones...</p>}
+      {!error && !loading && <div className="max-h-[70vh] overflow-y-auto space-y-4 p-4">
         <section>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-uta-navy">Solicitudes de Grupo</h3>
@@ -68,6 +78,7 @@ export default function NotificationPanel({
                   <div className="mt-3 flex gap-2">
                     <button
                       type="button"
+                      disabled={busy}
                       onClick={async () => await onRespondInvite(Number(invite.id), true)}
                       className="flex-1 rounded-lg bg-uta-gold px-3 py-2 text-xs font-semibold text-uta-navy transition hover:bg-uta-gold-dark"
                     >
@@ -76,6 +87,7 @@ export default function NotificationPanel({
 
                     <button
                       type="button"
+                      disabled={busy}
                       onClick={async () => await onRespondInvite(Number(invite.id), false)}
                       className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
                     >
@@ -113,7 +125,8 @@ export default function NotificationPanel({
                     {!item.leido && (
                       <button
                         type="button"
-                        onClick={async () => await onMarkGeneralRead(Number(item.id))}
+                        disabled={busy}
+                      onClick={async () => await onMarkGeneralRead(Number(item.id))}
                         className="shrink-0 text-xs font-semibold text-uta-gold"
                       >
                         Marcar leída
@@ -151,8 +164,8 @@ export default function NotificationPanel({
                     {!item.leida && (
                       <button
                         type="button"
-                        onClick={async () => {
-                          console.log('Marcando notificación de grupo:', item.id)
+                        disabled={busy}
+                      onClick={async () => {
                           await onMarkGroupRead(Number(item.id))
                         }}
                         className="shrink-0 text-xs font-semibold text-uta-gold"
@@ -166,7 +179,7 @@ export default function NotificationPanel({
             </div>
           )}
         </section>
-      </div>
+      </div>}
     </div>
   )
-}   
+}

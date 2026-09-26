@@ -60,11 +60,13 @@ export const trustGroupsRepo = {
   },
 
   async deleteById(groupId: number): Promise<boolean> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('grupos_confianza')
       .delete()
       .eq('id', groupId)
-    return !error
+      .select('id')
+    if (error) throw error
+    return Boolean(data?.length)
   },
 
   // ---------- Membresía ----------
@@ -141,20 +143,24 @@ export const trustGroupsRepo = {
   },
 
   async removeMemberById(memberId: number): Promise<boolean> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('grupo_miembros')
       .delete()
       .eq('id', memberId)
-    return !error
+      .select('id')
+    if (error) throw error
+    return Boolean(data?.length)
   },
 
   async removeUserFromGroup(groupId: number, userId: number): Promise<boolean> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('grupo_miembros')
       .delete()
       .eq('grupo_id', groupId)
       .eq('usuario_id', userId)
-    return !error
+      .select('id')
+    if (error) throw error
+    return Boolean(data?.length)
   },
 
   // ---------- Solicitudes ----------
@@ -232,11 +238,14 @@ export const trustGroupsRepo = {
     requestId: number,
     estado: 'aceptado' | 'rechazado'
   ): Promise<boolean> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('solicitudes_grupo')
       .update({ estado })
       .eq('id', requestId)
-    return !error
+      .eq('estado', 'pendiente')
+      .select('id')
+    if (error) throw error
+    return Boolean(data?.length)
   },
 
   async listPendingInvitationsForUser(

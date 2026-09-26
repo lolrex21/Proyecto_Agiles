@@ -19,6 +19,8 @@ export default function NotificationBell() {
   const [pendingInvites, setPendingInvites] = useState<GroupRequest[]>([])
   const [generalNotifications, setGeneralNotifications] = useState<GeneralNotification[]>([])
   const [groupNotifications, setGroupNotifications] = useState<GroupNotification[]>([])
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const user = getCurrentUser()
@@ -31,6 +33,8 @@ export default function NotificationBell() {
     }
 
     setLoading(true)
+    try {
+      setError('')
     const [summaryResult, invites, general, group] = await Promise.all([
       getNotificationSummary(userId),
       getPendingInvitesForUser(userId),
@@ -42,12 +46,19 @@ export default function NotificationBell() {
     setPendingInvites(invites)
     setGeneralNotifications(general)
     setGroupNotifications(group)
-    setLoading(false)
+
+    } catch {
+      setError('No se pudieron actualizar las notificaciones. Revisa tu conexión.')
+    } finally {
+      setLoading(false)
+    }
   }, [userId])
 
   useEffect(() => {
     if (!userId) return
 
+    // Carga inicial asíncrona al suscribirse a la fuente externa.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadNotifications()
     const subscription = subscribeToNotificationChannels(userId, () => {
       void loadNotifications()
@@ -69,36 +80,45 @@ export default function NotificationBell() {
   const handleRespondInvite = useCallback(
     async (requestId: number, accept: boolean) => {
       if (!userId) return
-      await respondToGroupInvitation(requestId, userId, accept)
-      await loadNotifications()
+      setBusy(true)
+      setError('')
+      try {
+        const result = await respondToGroupInvitation(requestId, userId, accept)
+        if (!result.success) { setError(result.message); return }
+        await loadNotifications()
+      } catch {
+        setError('No se pudo responder la invitación. Inténtalo de nuevo.')
+      } finally { setBusy(false) }
     },
     [loadNotifications, userId]
   )
 
   const handleMarkGeneralRead = useCallback(
     async (notificationId: number) => {
-      await markGeneralNotificationRead(notificationId)
-      await loadNotifications()
+      setBusy(true)
+      setError('')
+      try {
+        if (!await markGeneralNotificationRead(notificationId)) {
+          setError('No se encontró la notificación. Actualiza la lista.'); return
+        }
+        await loadNotifications()
+      } catch { setError('No se pudo marcar la notificación como leída.') }
+      finally { setBusy(false) }
     },
     [loadNotifications]
   )
 
 const handleMarkGroupRead = useCallback(
   async (notificationId: number) => {
-    const ok = await markGroupNotificationRead(Number(notificationId))
-
-    if (ok) {
-      setGroupNotifications(prev =>
-        prev.filter(item => Number(item.id) !== Number(notificationId))
-      )
-
-      setSummary(prev => ({
-        ...prev,
-        unreadGroup: Math.max(prev.unreadGroup - 1, 0),
-      }))
-    }
-
-    await loadNotifications()
+    setBusy(true)
+    setError('')
+    try {
+      if (!await markGroupNotificationRead(notificationId)) {
+        setError('No se encontró la notificación. Actualiza la lista.'); return
+      }
+      await loadNotifications()
+    } catch { setError('No se pudo marcar la notificación como leída.') }
+    finally { setBusy(false) }
   },
   [loadNotifications]
 )
@@ -125,8 +145,12 @@ const handleMarkGroupRead = useCallback(
         )}
       </button>
 
-      {panelOpen && !loading && (
+      {panelOpen && (
         <NotificationPanel
+          loading={loading}
+          error={error}
+          busy={busy}
+          onRetry={loadNotifications}
           pendingInvites={pendingInvites}
           generalNotifications={generalNotifications}
           groupNotifications={groupNotifications}

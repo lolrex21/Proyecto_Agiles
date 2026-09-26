@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getUserTrustGroups, deleteTrustGroup } from '../services/trustGroupService'
 import { getCurrentUser } from '../services/authService'
 import type { TrustGroup } from '../types/trustGroup'
@@ -16,13 +16,14 @@ export default function TrustGroupList({ refreshTrigger }: TrustGroupListProps) 
   const [selectedGroup, setSelectedGroup] = useState<TrustGroup | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
 
   const user = getCurrentUser()
   const userId = user?.id ? Number(user.id) : null
 
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     if (!userId) {
       setGroups([])
       setIsLoading(false)
@@ -30,14 +31,21 @@ export default function TrustGroupList({ refreshTrigger }: TrustGroupListProps) 
     }
 
     setIsLoading(true)
-    const userGroups = await getUserTrustGroups(userId)
-    setGroups(userGroups)
-    setIsLoading(false)
-  }
+    setLoadError('')
+    try {
+      setGroups(await getUserTrustGroups(userId))
+    } catch {
+      setLoadError('No se pudieron cargar los datos. Revisa tu conexión.')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [userId])
 
   useEffect(() => {
+    // Carga inicial asíncrona; el estado distingue carga, éxito y error.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadGroups()
-  }, [refreshTrigger, userId])
+  }, [refreshTrigger, loadGroups])
 
 const handleDeleteGroup = async (groupId: number) => {
   if (!userId) {
@@ -50,6 +58,7 @@ const handleDeleteGroup = async (groupId: number) => {
     return
   }
 
+    try {
   const result = await deleteTrustGroup(Number(groupId), userId)
 
   if (result.success) {
@@ -69,6 +78,10 @@ const handleDeleteGroup = async (groupId: number) => {
   }
 
   setTimeout(() => setMessage(''), 3000)
+    } catch {
+      setMessageType('error')
+      setMessage('No se pudo completar la operación. Revisa tu conexión e inténtalo de nuevo.')
+    }
 }
 
   const handleSelectGroup = (group: TrustGroup) => {
@@ -84,6 +97,13 @@ const handleDeleteGroup = async (groupId: number) => {
 
   const handleManageMembers = () => {
     setViewMode('manage')
+  }
+
+  if (loadError) {
+    return <div role="alert" className="p-4 text-uta-red">
+      <p>{loadError}</p>
+      <button type="button" onClick={() => void loadGroups()}>Reintentar</button>
+    </div>
   }
 
   if (isLoading) {
@@ -147,6 +167,7 @@ const handleDeleteGroup = async (groupId: number) => {
           )}
         </div>
 
+        {message && <p role="status" className="mb-4 text-uta-red">{message}</p>}
         <GroupMembersView group={selectedGroup} onMembersChanged={loadGroups} />
       </div>
     )

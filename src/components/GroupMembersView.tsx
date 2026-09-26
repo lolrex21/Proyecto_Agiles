@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getGroupMembers, removeMember } from '../services/trustGroupService'
 import { getCurrentUser } from '../services/authService'
 import type { TrustGroup, TrustGroupMember } from '../types/trustGroup'
@@ -11,6 +11,7 @@ interface GroupMembersViewProps {
 export default function GroupMembersView({ group, onMembersChanged }: GroupMembersViewProps) {
   const [members, setMembers] = useState<TrustGroupMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
 
@@ -18,16 +19,23 @@ export default function GroupMembersView({ group, onMembersChanged }: GroupMembe
   const currentUserId = currentUser?.id ? Number(currentUser.id) : null
   const isGroupAdmin = group.usuario_creador_id === currentUserId
 
-  const loadMembers = async () => {
+  const loadMembers = useCallback(async () => {
     setIsLoading(true)
-    const groupMembers = await getGroupMembers(Number(group.id))
-    setMembers(groupMembers)
-    setIsLoading(false)
-  }
+    setLoadError('')
+    try {
+      setMembers(await getGroupMembers(Number(group.id)))
+    } catch {
+      setLoadError('No se pudieron cargar los datos. Revisa tu conexión.')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [group.id])
 
   useEffect(() => {
+    // Carga inicial asíncrona; el estado distingue carga, éxito y error.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadMembers()
-  }, [group.id])
+  }, [loadMembers])
 
   const handleRemoveMember = async (memberId: number, memberEmail?: string) => {
     if (!currentUserId) {
@@ -46,6 +54,7 @@ export default function GroupMembersView({ group, onMembersChanged }: GroupMembe
       return
     }
 
+    try {
     const result = await removeMember(Number(memberId), currentUserId)
 
     if (result.success) {
@@ -59,6 +68,17 @@ export default function GroupMembersView({ group, onMembersChanged }: GroupMembe
     }
 
     setTimeout(() => setMessage(''), 3000)
+    } catch {
+      setMessageType('error')
+      setMessage('No se pudo completar la operación. Revisa tu conexión e inténtalo de nuevo.')
+    }
+  }
+
+  if (loadError) {
+    return <div role="alert" className="p-4 text-uta-red">
+      <p>{loadError}</p>
+      <button type="button" onClick={() => void loadMembers()}>Reintentar</button>
+    </div>
   }
 
   if (isLoading) {
