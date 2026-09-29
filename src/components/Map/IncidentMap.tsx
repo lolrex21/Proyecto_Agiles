@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react'
 import type { Incident } from '../../types/incident'
 import { usePolygons } from '../../hooks/usePolygons'
 import { getZoneByPoint } from '../../services/polygonService'
+import { getIncidentColor } from '../../constants/incidentConfig'
 
 interface IncidentMapProps {
   incidents: Incident[]
@@ -40,6 +41,8 @@ export default function IncidentMap({
 
   // 🎯 ASIGNAR ZONA A CADA INCIDENTE AUTOMÁTICAMENTE
   useEffect(() => {
+    let isCurrent = true
+
     const assignZones = async () => {
       const updated = await Promise.all(
         incidents.map(async (incident) => {
@@ -50,7 +53,8 @@ export default function IncidentMap({
           ) {
             const zone = await getZoneByPoint(
               Number(incident.latitud),
-              Number(incident.longitud)
+              Number(incident.longitud),
+              zones
             )
 
             return {
@@ -62,33 +66,26 @@ export default function IncidentMap({
           return incident
         })
       )
-      setIncidentsWithZone(updated)
+
+      if (isCurrent) {
+        setIncidentsWithZone(updated)
+      }
     }
 
     if (incidents.length > 0) {
-      assignZones()
+      void assignZones()
     }
-  }, [incidents])
+
+    return () => {
+      isCurrent = false
+    }
+  }, [incidents, zones])
 
   const handleMarkerClick = (incident: Incident) => {
     setSelectedMarker(incident)
     if (onMarkerClick) {
       onMarkerClick(incident)
     }
-  }
-
-  // 🎨 COLORES POR TIPO DE INCIDENTE
-  const getIncidentColor = (tipo: string): string => {
-    const colors: Record<string, string> = {
-      robo: '#FF0000',
-      agresion: '#FF6600',
-      vandalismo: '#FFAA00',
-      sospechoso: '#9900FF',
-      accidente: '#0066FF',
-      incendio: '#FF3300',
-      otro: '#666666',
-    }
-    return colors[tipo.toLowerCase()] || colors.otro
   }
 
   if (loading) {
@@ -140,7 +137,7 @@ export default function IncidentMap({
             />
           ))}
 
-          {/* ========== DIBUJAR MARCADORES DE INCIDENTES ========== */}
+          {/* ========== DIBUJAR MARCADORES DE INCIDENTES (OCP) ========== */}
           {incidentsWithLocation.map((incident) => (
             <Marker
               key={incident.id}

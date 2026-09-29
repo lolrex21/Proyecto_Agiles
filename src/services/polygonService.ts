@@ -7,7 +7,9 @@ import { incidentsRepo } from '../db/incidentsRepo'
 
 export type { CoordinatesPoint, ZonePolygon }
 
-// 📌 OBTENER TODAS LAS ZONAS DEL CAMPUS HUACHI
+/**
+ * Obtiene todos los polígonos de zonas del Campus Huachi.
+ */
 export const getZonePolygons = async (): Promise<ZonePolygon[]> => {
   try {
     return await polygonsRepo.listByCampus('Huachi')
@@ -17,7 +19,9 @@ export const getZonePolygons = async (): Promise<ZonePolygon[]> => {
   }
 }
 
-// 📌 OBTENER UNA ZONA ESPECÍFICA
+/**
+ * Obtiene una zona específica por su identificador.
+ */
 export const getZoneById = async (id: number): Promise<ZonePolygon | null> => {
   try {
     return await polygonsRepo.findById(id)
@@ -27,7 +31,10 @@ export const getZoneById = async (id: number): Promise<ZonePolygon | null> => {
   }
 }
 
-// 🎯 FUNCIÓN CRÍTICA: RAY CASTING - Saber si un punto está dentro de un polígono
+/**
+ * Ray Casting: algoritmo puro para determinar si un punto coordenado está contenido
+ * dentro del límite de un polígono cerrado.
+ */
 export const isPointInPolygon = (
   point: CoordinatesPoint,
   polygon: CoordinatesPoint[]
@@ -35,7 +42,6 @@ export const isPointInPolygon = (
   const { lat, lng } = point
   let inside = false
 
-  // Algoritmo Ray Casting
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const xi = polygon[i].lng
     const yi = polygon[i].lat
@@ -52,31 +58,48 @@ export const isPointInPolygon = (
   return inside
 }
 
-// 📍 FUNCIÓN PRINCIPAL: Determinar en qué zona está un incidente
+/**
+ * Búsqueda pura en memoria de la zona correspondiente a un punto para evitar llamadas N+1 a la red.
+ */
+export const findZoneByCoordinates = (
+  point: CoordinatesPoint,
+  zones: ZonePolygon[]
+): ZonePolygon | null => {
+  for (const zone of zones) {
+    if (isPointInPolygon(point, zone.coordenadas)) {
+      return zone
+    }
+  }
+  return null
+}
+
+/**
+ * Determina en qué zona se encuentra una coordenada geográfica.
+ * Acepta zonas precargadas opcionales para evitar consultas redundantes a la base de datos.
+ */
 export const getZoneByPoint = async (
   lat: number,
-  lng: number
+  lng: number,
+  preloadedZones?: ZonePolygon[]
 ): Promise<ZonePolygon | null> => {
   try {
-    const zones = await polygonsRepo.listByCampus('Huachi')
     const point: CoordinatesPoint = { lat, lng }
 
-    for (const zone of zones) {
-      if (isPointInPolygon(point, zone.coordenadas)) {
-        console.log(`Incidente en: ${zone.nombre}`)
-        return zone
-      }
+    if (preloadedZones && preloadedZones.length > 0) {
+      return findZoneByCoordinates(point, preloadedZones)
     }
 
-    console.warn(`Punto (${lat}, ${lng}) no está en ninguna zona`)
-    return null
+    const zones = await getZonePolygons()
+    return findZoneByCoordinates(point, zones)
   } catch (error) {
     console.error('Error getting zone by point:', error)
     return null
   }
 }
 
-// ⚠️ ACTUALIZAR ZONA DE INCIDENTE EN BD
+/**
+ * Actualiza la zona asignada a un incidente.
+ */
 export const updateIncidentZone = async (
   incidentId: number,
   zoneId: number

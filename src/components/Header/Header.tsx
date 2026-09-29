@@ -1,20 +1,21 @@
 import { getCurrentUser, logout } from '../../services/authService'
-import NotificationBell from '../NotificationBell'   // 👈 campana
+import NotificationBell from '../NotificationBell'
 import './Header.css'
 
 export default function Header() {
   const user = getCurrentUser()
 
- const handleLogout = async () => {
+  const handleLogout = async () => {
     await logout()
     window.location.replace('/')
   }
 
-  const userName = user?.nombre || user?.name || 'Usuario'
-  const userEmail = user?.email || user?.correo || 'Correo no disponible'
-  const userRole = user?.rol || user?.role || user?.tipo_usuario || 'estudiante'
-
-  const isGuard = userRole === 'guardia' || userRole === 'guard'
+  // Unified UserSession contract consumption (LSP):
+  // Eliminates defensive checks (user?.nombre || user?.name) by relying on the adapter contract.
+  const userName = user?.nombre ?? 'Usuario'
+  const userEmail = user?.correo ?? 'Correo no disponible'
+  const userRole = user?.rol ?? 'usuario'
+  const isGuard = userRole === 'guardia'
 
   return (
     <header className="app-header">
@@ -33,7 +34,7 @@ export default function Header() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-          <NotificationBell />   {/* 👈 campana de notificaciones */}
+          <NotificationBell />
 
           <div className="user-card">
             <div className="user-avatar">
@@ -55,7 +56,7 @@ export default function Header() {
 
               {isGuard && (
                 <span className="user-zone">
-                  Zona: {user?.zona_id || 'Sin asignar'}
+                  Zona: {user?.zona_id ?? 'Sin asignar'}
                 </span>
               )}
             </div>

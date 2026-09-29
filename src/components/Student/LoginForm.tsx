@@ -1,47 +1,51 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useState, type ChangeEvent, type FormEvent } from 'react'
 import {
-  initDemoUser,
   isAuthenticated,
   loginUser,
   registerUser,
   signInWithGoogle,
 } from '../../services/authService'
+import type { LoginData } from '../../types/auth'
 
 interface LoginFormProps {
   onLogin: () => void
   initialMessage?: string
 }
 
-interface LoginErrors {
-  username?: string
+interface FormErrors {
+  email?: string
   password?: string
 }
 
-const defaultFormState = {
-  username: '',
+interface FormCredentials {
+  email: string
+  password: string
+}
+
+const defaultFormState: FormCredentials = {
+  email: '',
   password: '',
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export default function LoginForm({ onLogin, initialMessage = '' }: LoginFormProps) {
-  const [credentials, setCredentials] = useState(defaultFormState)
-  const [errors, setErrors] = useState<LoginErrors>({})
-  const [message, setMessage] = useState(initialMessage)
+  const [credentials, setCredentials] = useState<FormCredentials>(defaultFormState)
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<'login' | 'register'>('login')
 
-  useEffect(() => {
-    initDemoUser()
-  }, [])
+  const displayMessage = feedbackMessage !== null ? feedbackMessage : initialMessage
 
-  useEffect(() => {
-    setMessage(initialMessage)
-  }, [initialMessage])
+  const validate = (): boolean => {
+    const newErrors: FormErrors = {}
+    const trimmedEmail = credentials.email.trim()
 
-  const validate = () => {
-    const newErrors: LoginErrors = {}
-
-    if (!credentials.username.trim()) {
-      newErrors.username = 'El correo es obligatorio.'
+    if (!trimmedEmail) {
+      newErrors.email = 'El correo es obligatorio.'
+    } else if (!EMAIL_REGEX.test(trimmedEmail)) {
+      newErrors.email = 'Ingresa un formato de correo válido (ej. usuario@uta.edu.ec).'
     }
 
     if (!credentials.password.trim()) {
@@ -59,51 +63,56 @@ export default function LoginForm({ onLogin, initialMessage = '' }: LoginFormPro
 
     setCredentials(prev => ({ ...prev, [name]: value }))
 
-    if (errors[name as keyof LoginErrors]) {
-      setErrors(prev => ({ ...prev, [name as keyof LoginErrors]: undefined }))
+    if (errors[name as keyof FormErrors]) {
+      setErrors(prev => ({ ...prev, [name as keyof FormErrors]: undefined }))
     }
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setMessage('')
+    setFeedbackMessage('')
 
     if (!validate()) return
 
     setLoading(true)
 
+    const payload: LoginData = {
+      email: credentials.email.trim(),
+      password: credentials.password,
+    }
+
     const action = mode === 'login' ? loginUser : registerUser
-    const result = await action(credentials)
+    const result = await action(payload)
 
     setLoading(false)
 
     if (!result.success) {
-      setMessage(result.message)
+      setFeedbackMessage(result.message)
       return
     }
 
     if (mode === 'register') {
-      setMessage('Registro completado. Sesión iniciada automáticamente.')
+      setFeedbackMessage('Registro completado. Sesión iniciada automáticamente.')
     }
 
     onLogin()
   }
 
   const handleGoogleLogin = async () => {
-    setMessage('')
+    setFeedbackMessage('')
     setLoading(true)
 
     const result = await signInWithGoogle()
 
     if (!result.success) {
       setLoading(false)
-      setMessage(result.message)
+      setFeedbackMessage(result.message)
     }
   }
 
   const toggleMode = () => {
     setMode(prev => (prev === 'login' ? 'register' : 'login'))
-    setMessage('')
+    setFeedbackMessage('')
     setErrors({})
   }
 
@@ -151,26 +160,26 @@ export default function LoginForm({ onLogin, initialMessage = '' }: LoginFormPro
         <form onSubmit={handleSubmit} noValidate className="space-y-4 sm:space-y-5">
           <div>
             <label
-              htmlFor="username"
+              htmlFor="email"
               className="block text-xs sm:text-sm font-semibold text-uta-navy mb-2"
             >
               Correo
             </label>
 
             <input
-              id="username"
-              name="username"
+              id="email"
+              name="email"
               type="email"
-              value={credentials.username}
+              value={credentials.email}
               onChange={handleInputChange}
               placeholder="tu.email@gmail.com"
               className="w-full rounded-xl sm:rounded-2xl border-2 border-gray-200 px-4 py-3 sm:py-4 text-sm sm:text-base focus:border-uta-gold focus:outline-none focus:ring-2 focus:ring-uta-gold/20 transition"
-              autoComplete="username"
+              autoComplete="email"
             />
 
-            {errors.username && (
+            {errors.email && (
               <p className="mt-2 text-xs text-uta-red font-medium">
-                {errors.username}
+                {errors.email}
               </p>
             )}
           </div>
@@ -201,9 +210,15 @@ export default function LoginForm({ onLogin, initialMessage = '' }: LoginFormPro
             )}
           </div>
 
-          {message && (
-            <div className="rounded-xl sm:rounded-2xl bg-uta-gray/30 px-4 py-3 sm:py-4 text-xs sm:text-sm text-gray-700 border border-gray-200">
-              {message}
+          {displayMessage && (
+            <div
+              className={`rounded-xl sm:rounded-2xl px-4 py-3 sm:py-4 text-xs sm:text-sm border font-medium ${
+                displayMessage.includes('completado')
+                  ? 'bg-green-50 text-green-700 border-green-200'
+                  : 'bg-red-50 text-uta-red border-red-200'
+              }`}
+            >
+              {displayMessage}
             </div>
           )}
 

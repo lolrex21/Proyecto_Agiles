@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient'
 import type { Session } from '@supabase/supabase-js'
-import type { AuthResult, LoginData } from '../types/auth'
+import type { AuthResult, LoginData, UserSession } from '../types/auth'
 
 const USER_STORAGE_KEY = 'uta-auth-user'
 const SESSION_TOKEN_KEY = 'uta-auth-token'
@@ -21,7 +21,47 @@ const createToken = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-const saveLocalSession = (user: any, token: string) => {
+/**
+ * Adapter pattern (Liskov Substitution Principle - LSP):
+ * Unifies diverse user representations (Google OAuth user, database row, legacy storage)
+ * into the standard UserSession contract so all components consume predictable fields.
+ */
+export const mapToUserSession = (raw: unknown): UserSession => {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('Invalid user payload')
+  }
+
+  const record = raw as Record<string, unknown>
+  const id = Number(record.id) || 0
+  const correo = String(record.correo || record.email || '').trim().toLowerCase()
+  const metadata = (record.user_metadata || {}) as Record<string, unknown>
+
+  const rawName = String(
+    record.nombre ||
+    record.name ||
+    metadata.full_name ||
+    metadata.name ||
+    metadata.user_name ||
+    (correo ? correo.split('@')[0] : '') ||
+    'Usuario'
+  ).trim()
+
+  const rawRole = String(
+    record.rol || record.role || record.tipo_usuario || 'usuario'
+  ).trim().toLowerCase()
+
+  const rol = (rawRole === 'guard' || rawRole === 'guardia') ? 'guardia' : rawRole
+
+  return {
+    id,
+    nombre: rawName,
+    correo,
+    rol,
+    zona_id: record.zona_id != null ? Number(record.zona_id) : null,
+  }
+}
+
+const saveLocalSession = (user: UserSession, token: string) => {
   localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
   localStorage.setItem(SESSION_TOKEN_KEY, token)
 }
@@ -39,13 +79,20 @@ const isAllowedGoogleEmail = (email: string) => {
     .endsWith(`@${ALLOWED_GOOGLE_EMAIL_DOMAIN.toLowerCase()}`)
 }
 
-const getGoogleDisplayName = (metadata: any, email: string) => {
-  return (
-    metadata?.full_name ||
-    metadata?.name ||
-    metadata?.user_name ||
-    email.split('@')[0]
-  )
+const getGoogleDisplayName = (
+  metadata: Record<string, unknown> | null | undefined,
+  email: string
+): string => {
+  if (!metadata) return email.split('@')[0]
+
+  const nameCandidate =
+    metadata.full_name ||
+    metadata.name ||
+    metadata.user_name
+
+  return typeof nameCandidate === 'string' && nameCandidate.trim()
+    ? nameCandidate.trim()
+    : email.split('@')[0]
 }
 
 const syncSessionWithUsuariosTable = async (
@@ -90,12 +137,14 @@ const syncSessionWithUsuariosTable = async (
   }
 
   if (existingUser) {
-    saveLocalSession(existingUser, session.access_token)
+    const sessionUser = mapToUserSession(existingUser)
+    saveLocalSession(sessionUser, session.access_token)
 
     return {
       success: true,
       message: 'Inicio de sesión con Google exitoso.',
       token: session.access_token,
+      user: sessionUser,
     }
   }
 
@@ -121,24 +170,23 @@ const syncSessionWithUsuariosTable = async (
     }
   }
 
-  saveLocalSession(newUser, session.access_token)
+  const sessionUser = mapToUserSession(newUser)
+  saveLocalSession(sessionUser, session.access_token)
 
   return {
     success: true,
     message: 'Inicio de sesión con Google exitoso.',
     token: session.access_token,
+    user: sessionUser,
   }
 }
 
-export const initDemoUser = async () => {
-  return
-}
+export const registerUser = async (credentials: LoginData): Promise<AuthResult> => {
+  const rawEmail = credentials.email || credentials.username || ''
+  const safeEmail = sanitize(rawEmail).toLowerCase()
+  const safePassword = sanitize(credentials.password)
 
-export const registerUser = async ({ username, password }: LoginData): Promise<AuthResult> => {
-  const safeUsername = sanitize(username)
-  const safePassword = sanitize(password)
-
-  if (!safeUsername || !safePassword) {
+  if (!safeEmail || !safePassword) {
     return {
       success: false,
       message: 'El correo y la contraseña son obligatorios.',
@@ -156,8 +204,8 @@ export const registerUser = async ({ username, password }: LoginData): Promise<A
     .from('usuarios')
     .insert([
       {
-        nombre: safeUsername.split('@')[0],
-        correo: safeUsername,
+        nombre: safeEmail.split('@')[0],
+        correo: safeEmail,
         password: safePassword,
         rol: 'usuario',
       },
@@ -175,20 +223,23 @@ export const registerUser = async ({ username, password }: LoginData): Promise<A
   }
 
   const token = createToken()
-  saveLocalSession(data, token)
+  const sessionUser = mapToUserSession(data)
+  saveLocalSession(sessionUser, token)
 
   return {
     success: true,
     message: 'Registro exitoso.',
     token,
+    user: sessionUser,
   }
 }
 
-export const loginUser = async ({ username, password }: LoginData): Promise<AuthResult> => {
-  const safeUsername = sanitize(username)
-  const safePassword = sanitize(password)
+export const loginUser = async (credentials: LoginData): Promise<AuthResult> => {
+  const rawEmail = credentials.email || credentials.username || ''
+  const safeEmail = sanitize(rawEmail).toLowerCase()
+  const safePassword = sanitize(credentials.password)
 
-  if (!safeUsername || !safePassword) {
+  if (!safeEmail || !safePassword) {
     return {
       success: false,
       message: 'Correo y contraseña requeridos.',
@@ -198,7 +249,7 @@ export const loginUser = async ({ username, password }: LoginData): Promise<Auth
   const { data, error } = await supabase
     .from('usuarios')
     .select('*')
-    .eq('correo', safeUsername)
+    .eq('correo', safeEmail)
     .eq('password', safePassword)
     .single()
 
@@ -210,12 +261,14 @@ export const loginUser = async ({ username, password }: LoginData): Promise<Auth
   }
 
   const token = createToken()
-  saveLocalSession(data, token)
+  const sessionUser = mapToUserSession(data)
+  saveLocalSession(sessionUser, token)
 
   return {
     success: true,
     message: 'Autenticación exitosa.',
     token,
+    user: sessionUser,
   }
 }
 
@@ -283,13 +336,14 @@ export const getAuthToken = () => localStorage.getItem(SESSION_TOKEN_KEY)
 
 export const isAuthenticated = () => Boolean(getAuthToken())
 
-export const getCurrentUser = () => {
+export const getCurrentUser = (): UserSession | null => {
   const user = localStorage.getItem(USER_STORAGE_KEY)
 
   if (!user) return null
 
   try {
-    return JSON.parse(user)
+    const parsed = JSON.parse(user)
+    return mapToUserSession(parsed)
   } catch {
     clearLocalSession()
     return null

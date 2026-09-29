@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
 import { supabase } from './services/supabaseClient'
 import {
   isAuthenticated,
   getCurrentUser,
   syncGoogleSession,
 } from './services/authService'
+import type { UserSession } from './types/auth'
 
 import LoginForm from './components/Student/LoginForm'
 import IncidentReportForm from './components/Student/IncidentReportForm'
@@ -22,7 +24,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<MainTab>('reportar')
   const [refreshTrustGroups, setRefreshTrustGroups] = useState(0)
   const [sessionMessage, setSessionMessage] = useState('')
-  const [currentUser, setCurrentUser] = useState<any>(getCurrentUser())
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(getCurrentUser())
 
   useEffect(() => {
     let isMounted = true
@@ -34,7 +36,7 @@ function App() {
       }
     }
 
-    const applyResult = async (session: any) => {
+    const applyResult = async (session: Session | null) => {
       if (handled || !isMounted) return
       handled = true
 
