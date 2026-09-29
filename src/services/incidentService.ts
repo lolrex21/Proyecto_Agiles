@@ -84,22 +84,8 @@ export const cancelIncident = async (id: number): Promise<Incident | null> => {
 
 export const getActiveIncidentForGuard = async (guardId: string): Promise<Incident | null> => {
   try {
-    // Necesitamos usar supabase directamente aquí o agregarlo a incidentsRepo
-    // Por simplicidad, importaremos supabase si no está en incidentsRepo, pero 
-    // mejor lo llamamos vía incidentsRepo si es posible. Dado que incidentsRepo 
-    // no tiene este método, lo haremos aquí temporalmente o podemos asumir que
-    // implementaremos una consulta básica.
-    const { supabase } = await import('../db/supabaseClient')
-    const { data, error } = await supabase
-      .from('incidentes')
-      .select('*')
-      .eq('guardia_id', guardId)
-      .eq('estado', 'Atendido')
-      .limit(1)
-      .maybeSingle()
-
-    if (error) throw error
-    return data ? (data as unknown as Incident) : null
+    const row = await incidentsRepo.findActiveForGuard(guardId)
+    return row ? (row as unknown as Incident) : null
   } catch (error) {
     console.error('Error in getActiveIncidentForGuard:', error)
     return null
@@ -108,19 +94,9 @@ export const getActiveIncidentForGuard = async (guardId: string): Promise<Incide
 
 export const takeIncident = async (incidentId: number, guardId: string): Promise<Incident | null> => {
   try {
-    const { supabase } = await import('../db/supabaseClient')
-    const { error: updateError } = await supabase
-      .from('incidentes')
-      .update({
-        estado: 'Atendido',
-        guardia_id: guardId,
-      })
-      .eq('id', incidentId)
-      .eq('estado', 'Pendiente')
-
-    if (updateError) throw updateError
-    
-    return await getIncidentById(incidentId)
+    const row = await incidentsRepo.takeByGuard(incidentId, guardId)
+    if (!row) return await getIncidentById(incidentId)
+    return row as unknown as Incident
   } catch (error) {
     console.error('Error taking incident:', error)
     throw error
@@ -129,17 +105,9 @@ export const takeIncident = async (incidentId: number, guardId: string): Promise
 
 export const closeIncident = async (incidentId: number, guardId: string): Promise<Incident | null> => {
   try {
-    const { supabase } = await import('../db/supabaseClient')
-    const { error: closeError } = await supabase
-      .from('incidentes')
-      .update({ estado: 'Cerrado' })
-      .eq('id', incidentId)
-      .eq('guardia_id', guardId)
-      .eq('estado', 'Atendido')
-
-    if (closeError) throw closeError
-
-    return await getIncidentById(incidentId)
+    const row = await incidentsRepo.closeByGuard(incidentId, guardId)
+    if (!row) return await getIncidentById(incidentId)
+    return row as unknown as Incident
   } catch (error) {
     console.error('Error closing incident:', error)
     throw error

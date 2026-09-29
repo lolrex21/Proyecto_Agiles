@@ -26,7 +26,7 @@ Los componentes principales (`GuardDashboard.tsx` e `IncidentReportForm.tsx`) er
 
 ### Resumen de Cambios en el Código
 
-- **`src/services/incidentService.ts`:** Mover los llamados directos a Supabase (como inserciones y actualizaciones) que estaban pegados en los archivos `.tsx` hacia este servicio dedicado. Ahora la interfaz no sabe ni le importa qué base de datos hay detrás.
+- **`src/services/incidentService.ts`:** Mover los llamados a datos (inserciones y actualizaciones) que estaban pegados en los archivos `.tsx` hacia este servicio dedicado. Las operaciones de lectura y escritura más comunes (`getIncidentById`, `reportIncident`, `updateIncidentDetails`, `cancelIncident`, `updateIncidentStatus`, `search`) se canalizan a través del repositorio `incidentsRepo`. Tres métodos (`getActiveIncidentForGuard`, `takeIncident`, `closeIncident`) resuelven sus consultas mediante un `await import('../db/supabaseClient')` directo al cliente de Supabase, ya que en este commit `incidentsRepo` aún no exponía esos verbos; ese subconjunto queda como deuda para una migración posterior al repositorio.
 - **`src/components/Student/IncidentReportForm.tsx`:** Se extrajo toda la lógica de obtención de coordenadas al nuevo hook **`useGeolocation.ts`**.
 - **`src/components/Guard/GuardDashboard.tsx`:** Se extrajo el pesado bloque de lógica de toma de incidentes, cierre de casos y peticiones de datos al hook **`useGuardActions.ts`**. Así también, la petición de notificaciones al navegador fue movida a **`useNotificationPermission.ts`**.
 
@@ -68,7 +68,7 @@ Los servicios convertían fallos de red o de Supabase en listas vacías, `null`,
 
 ### Aplicación de los cambios
 
-1. Copiar los archivos modificados y nuevos respetando sus rutas. El ZIP incluye el proyecto reconstruido desde el Repomix, sin `node_modules`, `.env` ni compilados. `CAMBIOS_MIEMBRO_2.patch` permite revisar exactamente las diferencias.
+1. Copiar los archivos modificados y nuevos respetando sus rutas. Las diferencias pueden revisarse directamente con `git log --stat` y `git show <commit>` sobre los commits `c558c17` (Jose Sanchez) y `b5eab97` (Washington Villalba). El proyecto excluye `node_modules`, `.env` y compilados.
 2. Antes de iniciar el frontend nuevo, ejecutar **una sola vez** `supabase/migrations/20260926223000_miembro2_atomicidad.sql` en la base Supabase que utiliza el proyecto. Si se parte de una base vacía, aplicar primero la migración inicial. Coordinar el cambio con el frontend: la versión anterior insertaba manualmente al administrador.
 3. Ejecutar `npm install`. Mantener la configuración local de `.env`; para una instalación nueva usar `.env.example` como guía.
 4. Ejecutar `npm run build`, `node --test tests/miembro2.test.mjs` y `npm run dev`.
@@ -158,4 +158,30 @@ La migración protege las nuevas creaciones y aceptaciones; no repara automátic
 | Pruebas existentes del proyecto (`tests/miembro2.test.mjs`) | 14/14 correctas. Sin regresiones ni afectación a los dominios de otros miembros. |
 | Total de pruebas de regresión e integración | 23/23 correctas ejecutadas de forma continua en Node.js. |
 
+---
 
+## 📌 Nota posterior — Pago de la deuda técnica
+
+Tras la verificación de los commits descrita al inicio de este documento, se detectó que el refactor de Bryan Quitto (commit `c2ffd20`) dejaba una **deuda técnica** en `src/services/incidentService.ts`: tres funciones (`getActiveIncidentForGuard`, `takeIncident`, `closeIncident`) realizaban `await import('../db/supabaseClient')` para acceder directamente al cliente de Supabase, saltándose el repositorio `incidentsRepo` recién creado. El propio código incluía el comentario `// Necesitamos usar supabase directamente aquí o agregarlo a incidentsRepo` reconociendo la incoherencia.
+
+**Resolución aplicada:**
+
+1. Se agregaron tres métodos al repositorio `src/db/incidentsRepo.ts`:
+   - `findActiveForGuard(guardId)`: consulta el incidente activo de un guardia.
+   - `takeByGuard(incidentId, guardId)`: marca un incidente como `Atendido` y le asigna el guardia, solo si estaba `Pendiente`.
+   - `closeByGuard(incidentId, guardId)`: marca un incidente como `Cerrado`, solo si está `Atendido` y pertenece al guardia indicado.
+
+2. Se reescribieron las tres funciones de `src/services/incidentService.ts` para que **únicamente** deleguen al repositorio. Se eliminaron los tres `await import('../db/supabaseClient')` y el comentario autoexculpatorio. La interfaz del servicio público no cambió: las firmas, tipos de retorno y semántica observable se mantienen idénticas.
+
+**Verificación realizada tras el cambio:**
+
+| Verificación | Resultado |
+| --- | --- |
+| Compilación TypeScript (`tsc -b`) | Exitosa, cero errores de tipos. |
+| ESLint en `incidentsRepo.ts` y `incidentService.ts` | Sin regresiones. Los 2 errores `@typescript-eslint/no-explicit-any` en líneas 57 y 67 de `incidentService.ts` ya existían antes del cambio (corresponden a `reportIncident` y `updateIncidentDetails`); este refactor no los introdujo. |
+| Pruebas automatizadas (`node --test tests/miembro2.test.mjs`) | 14/14 correctas. |
+| Pruebas automatizadas (`node --test tests/miembro3.test.mjs`) | 9/9 correctas. |
+| Build de producción (`npm run build`: `tsc -b && vite build`) | Exitoso. |
+| Validación contra Supabase real (proyecto `zkaajxqsiugyzpqrreaw`) vía MCP | Las queries equivalentes a las nuevas funciones del repo (`findActiveForGuard`, `takeByGuard`, `closeByGuard`) se ejecutaron contra un incidente de prueba (id=6) y devolvieron exactamente los mismos resultados que la implementación anterior con `supabase` directo. Se cubrieron los casos positivo, negativo (`takeByGuard` sobre incidente ya cerrado → 0 filas) y de consistencia (`findActiveForGuard` deja de encontrar el incidente tras `closeByGuard`). El incidente de prueba fue restaurado a su estado original, dejando la base limpia. |
+
+Con esta corrección, `src/services/incidentService.ts` cumple el principio de inversión de dependencias y la separación entre el dominio y la capa de persistencia, alineándose con la afirmación original del refactor de Bryan sobre que "la interfaz no sabe qué base de datos hay detrás".

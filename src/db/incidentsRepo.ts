@@ -95,4 +95,44 @@ export const incidentsRepo = {
 
     return !error
   },
+
+  async findActiveForGuard(guardId: string): Promise<Incidente | null> {
+    const { data, error } = await supabase
+      .from('incidentes')
+      .select('*')
+      .eq('guardia_id', guardId)
+      .eq('estado', 'Atendido')
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw error
+    return data
+  },
+
+  async takeByGuard(incidentId: number, guardId: string): Promise<Incidente | null> {
+    const { data, error } = await supabase
+      .from('incidentes')
+      .update({ estado: 'Atendido', guardia_id: guardId })
+      .eq('id', incidentId)
+      .eq('estado', 'Pendiente')
+      .select()
+      .maybeSingle()
+
+    if (error) throw error
+    return data
+  },
+
+  async closeByGuard(incidentId: number, guardId: string): Promise<Incidente | null> {
+    const { data, error } = await supabase
+      .from('incidentes')
+      .update({ estado: 'Cerrado' })
+      .eq('id', incidentId)
+      .eq('guardia_id', guardId)
+      .eq('estado', 'Atendido')
+      .select()
+      .maybeSingle()
+
+    if (error) throw error
+    return data
+  },
 }
